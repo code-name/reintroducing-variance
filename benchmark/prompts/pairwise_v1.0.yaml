@@ -1,0 +1,56 @@
+id: pairwise
+version: "1.0"
+status: draft
+created: "2026-10-22"
+changelog:
+  - "1.0 (2026-10-22): first draft. Robustness alternative to pointwise scoring. Always run each pair in both orders (A,B) and (B,A); disagreement between orders is the position-bias estimate."
+
+description: >
+  Pairwise comparison of two ideas that answered the same task. The judge says which idea
+  is more novel and which is more useful, or calls a tie. Pairwise scores are converted to
+  a latent scale (Bradley-Terry) in benchmark/agree.py and correlated with human means.
+
+variables:
+  - task_prompt
+  - idea_a
+  - idea_b
+  - novelty_statement
+  - usefulness_statement
+
+defaults:
+  novelty_statement: "novel (original, unusual, uncommon for this task)"
+  usefulness_statement: "useful (practical, feasible, valuable if carried out)"
+
+system: |
+  You are comparing ideas for a research study. Compare each dimension on its own and
+  reply with JSON and nothing else.
+
+user: |
+  The following task was given to the people or systems that produced the ideas:
+  "{task_prompt}"
+
+  Idea A:
+  "{idea_a}"
+
+  Idea B:
+  "{idea_b}"
+
+  Which idea is more {novelty_statement}? Which idea is more {usefulness_statement}?
+  Answer "A", "B" or "tie" for each, independently.
+
+  Reply with JSON only, in exactly this form:
+  {"more_novel": "<A|B|tie>", "more_useful": "<A|B|tie>", "rationale": "<one sentence>"}
+
+output_schema:
+  type: object
+  required: [more_novel, more_useful]
+  properties:
+    more_novel: {type: string, enum: [A, B, tie]}
+    more_useful: {type: string, enum: [A, B, tie]}
+    rationale: {type: string}
+
+run_defaults:
+  temperature: 0.0
+  max_tokens: 120
+  n_samples: 1
+  both_orders: true

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ page_title | default("Idea rating") }}{% endblock %} · Idea rating</title>
+  <link rel="stylesheet" href="{{ asset_url('/static/css/style.css') }}">
+</head>
+<body>
+  <div class="layout">
+    {% if user %}
+    <button class="sidebar-toggle" type="button" aria-label="Toggle sidebar" title="Collapse sidebar">&#9664;</button>
+    <nav class="sidebar">
+      <div class="brand">Idea rating<br><span style="font-weight:400;font-size:12px">OrgSci benchmark</span></div>
+      <a href="/dashboard" class="{{ 'active' if nav == 'dashboard' }}">Dashboard</a>
+      <a href="/rate" class="{{ 'active' if nav == 'rate' }}">Rate ideas</a>
+      {% if user.role == 'admin' %}
+      <div class="nav-section">Admin</div>
+      <a href="/admin" class="{{ 'active' if nav == 'admin' }}">Overview</a>
+      <a href="/admin/datasets" class="{{ 'active' if nav == 'admin-datasets' }}">Datasets</a>
+      <a href="/admin/analytics" class="{{ 'active' if nav == 'admin-analytics' }}">Analytics</a>
+      <a href="/admin/runs" class="{{ 'active' if nav == 'admin-runs' }}">Judge runs</a>
+      <a href="/admin/users" class="{{ 'active' if nav == 'admin-users' }}">Users</a>
+      <a href="/admin/exports" class="{{ 'active' if nav == 'admin-exports' }}">Exports</a>
+      {% endif %}
+      <div class="sidebar-footer">
+        <div class="who">{{ user.display_name }} <span class="role">({{ user.role }})</span></div>
+        <a href="/logout">Log out</a>
+      </div>
+    </nav>
+    {% endif %}
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="{{ asset_url('/static/js/layout.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analytics</h1>
+<p class="muted">Admin only. Raters never see these numbers.</p>
+<form method="get" class="form-row">
+  <select name="dataset">{% for d in datasets %}<option value="{{ d.name }}" {{ 'selected' if dataset and d.id == dataset.id }}>{{ d.name }}</option>{% endfor %}</select>
+  <button class="btn btn-secondary" type="submit">Show</button>
+</form>
+{% if dataset %}
+<div class="cards">
+  <div class="card"><h2>Coverage</h2><p>{{ cov.at_target }} of {{ cov.ideas }} ideas have {{ cov.target }} raters.</p></div>
+  <div class="card"><h2>Ratings</h2><p>{{ cov.ratings }} ratings from {{ cov.raters }} raters · {{ flags }} flags.</p></div>
+</div>
+{% for d in rubric.dimensions %}
+<h2>Most contested ideas: {{ d.label }}</h2>
+<p class="muted small-note">Largest spread between raters (standard deviation), ideas with at least 3 ratings.</p>
+<table class="table">
+  <thead><tr><th>Idea</th><th>Text</th><th>n</th><th>Mean</th><th>SD</th><th>SE</th><th>Split</th></tr></thead>
+  <tbody>
+  {% for r in contested[d.id] %}
+  <tr><td>{{ r.idea_key }}</td><td>{{ r.text[:120] }}</td><td>{{ r.n }}</td><td>{{ r.mean | fmt }}</td><td>{{ r.sd | fmt }}</td><td>{{ r.se | fmt }}</td><td>{{ r.split }}</td></tr>
+  {% else %}
+  <tr><td colspan="7" class="muted">Not enough ratings yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endfor %}
+<h2>Raters</h2>
+<table class="table">
+  <thead><tr><th>Rater code</th><th>Lab</th><th>Expertise</th><th>Kind</th><th>Ideas rated</th></tr></thead>
+  <tbody>
+  {% for r in raters %}<tr><td><code>{{ r.code }}</code></td><td>{{ r.lab or '' }}</td><td>{{ r.expertise }}</td><td>{{ r.role }}</td><td>{{ r.ideas }}</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

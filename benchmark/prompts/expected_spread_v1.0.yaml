@@ -1,0 +1,56 @@
+id: expected_spread
+version: "1.0"
+status: draft
+created: "2026-10-26"
+changelog:
+  - "1.0 (2026-10-26): first version, for the variance pipeline. Same rubric text as pointwise_v1.1; instead of one score the judge forecasts how ten independent raters would split across the scale."
+
+description: >
+  One idea per call. The judge is asked for the number of raters, out of ten, that would give each
+  scale point on each dimension. The forecast's mean and SD are compared with the human mean and
+  SD per idea. Rendered by benchmark.variance from the shared rubric.
+
+variables:
+  - task_prompt
+  - idea_text
+  - instructions
+  - scale_min
+  - scale_max
+  - anchor_text
+  - statement_block
+  - json_format       # {"novelty": {"1": <count>, ..., "5": <count>}, "usefulness": {...}}
+
+defaults: {}
+
+system: |
+  You forecast how a panel of ten independent human raters would rate an idea. People often
+  disagree about new ideas; your forecast should show as much disagreement as you expect them to
+  show, no more and no less. Reply with JSON and nothing else.
+
+user: |
+  The task the idea answered:
+  "{task_prompt}"
+
+  The idea:
+  "{idea_text}"
+
+  Ten raters each received these instructions:
+  {instructions}
+  Each rated their agreement with each statement on a scale from {scale_min} to {scale_max}, where {anchor_text}.
+
+  {statement_block}
+
+  For each statement, how many of the ten raters would give each scale point? The counts for a
+  statement must add up to 10.
+  Reply with JSON only, in exactly this form:
+  {json_format}
+
+output_schema:
+  type: object
+  required: ["<one key per rubric dimension>"]
+  note: one key per rubric dimension; each value maps every scale point to a count; counts sum to 10
+
+run_defaults:
+  temperature: 0.0
+  max_tokens: 800
+  n_samples: 1

@@ -1,0 +1,54 @@
+id: pointwise
+version: "1.1"
+status: draft
+created: "2026-10-22"
+changelog:
+  - "1.1 (2026-10-22): wording now comes from the shared rubric (configs/rubrics/*.yaml) that human raters see in the rating app, so humans and models get the same instructions, statements and anchors. Every scale point carries its anchor."
+  - "1.0: retired before any run."
+
+description: >
+  Pointwise rubric scoring of one idea on every dimension of the rubric, on the scale the human
+  raters used. Rendered by benchmark.judge.render_pointwise from a rubric file.
+
+variables:
+  - task_prompt          # what the idea answered
+  - idea_text
+  - instructions         # rubric instructions, verbatim
+  - scale_min
+  - scale_max
+  - anchor_text          # "1 = strongly disagree, 2 = disagree, ..."
+  - statement_block      # one line per dimension: "Statement 1 (novelty): This idea is novel."
+  - json_format          # {"novelty": <integer 1-5>, "usefulness": <integer 1-5>, "rationale": "<one sentence>"}
+  - few_shot_block       # empty unless perturbation P5
+
+defaults:
+  few_shot_block: ""
+
+system: |
+  You are rating ideas for a research study, as one of many independent raters.
+  Use only the scale you are given and reply with JSON and nothing else.
+
+user: |
+  The task the idea answered:
+  "{task_prompt}"
+
+  The idea:
+  "{idea_text}"
+
+  {instructions}
+  Rate your agreement with each statement on a scale from {scale_min} to {scale_max}, where {anchor_text}.
+
+  {statement_block}
+  {few_shot_block}
+  Reply with JSON only, in exactly this form:
+  {json_format}
+
+output_schema:
+  type: object
+  required: ["<one key per rubric dimension>"]
+  note: keys are the rubric's dimension ids; values are integers on the rubric scale; optional rationale string
+
+run_defaults:
+  temperature: 0.0
+  max_tokens: 800
+  n_samples: 1

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Users</h1>
+<p class="muted">Create accounts from the command line: <code>python -m benchmark.rating.cli create-user --username NAME [--admin] [--lab LAB] [--expertise trained_novice]</code>. Imported raters appear as <em>external</em> and cannot log in.</p>
+<table class="table">
+  <thead><tr><th>Username</th><th>Role</th><th>Lab</th><th>Expertise</th><th>Source</th><th>Created</th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr><td>{{ u.username }}</td><td>{{ u.role }}</td><td>{{ u.lab or '' }}</td><td>{{ u.expertise }}</td><td>{{ u.source }}</td><td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

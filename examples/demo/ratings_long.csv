@@ -1,0 +1,9 @@
+idea_id,rater_id,dimension,score,condition,rater_expertise
+d001,h1,novelty,1,baseline,novice
+d001,h1,usefulness,4,baseline,novice
+d001,h2,novelty,2,treatment,novice
+d001,h2,usefulness,4,treatment,novice
+d002,h1,novelty,4,baseline,novice
+d002,h1,usefulness,2,baseline,novice
+d002,h2,novelty,5,treatment,novice
+d002,h2,usefulness,2,treatment,novice

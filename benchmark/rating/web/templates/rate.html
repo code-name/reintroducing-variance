@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rate ideas</h1>
+<p class="progress">{{ dataset.name }} · you have rated {{ done }} idea{{ '' if done == 1 else 's' }}</p>
+{% if msg %}<div class="alert">{{ msg }}</div>{% endif %}
+{% if assignment %}
+<form method="post" action="/rate/submit" class="rate-wrap">
+  <input type="hidden" name="assignment_id" value="{{ assignment }}">
+  <section class="panel">
+    <h2>The task</h2>
+    <div class="task-prompt">{{ task_prompt }}</div>
+    <h2>The idea</h2>
+    <div class="idea-text">{{ idea_text }}</div>
+  </section>
+  <section class="panel">
+    <div class="instructions">{{ rubric.instructions }}</div>
+    {% for d in rubric.dimensions %}
+    <div class="dimension">
+      <p class="statement">{{ d.statement }}</p>
+      <div class="scale">
+        {% for v in range(rubric.scale_min, rubric.scale_max + 1) %}
+        <label><input type="radio" name="score_{{ d.id }}" value="{{ v }}">{{ v }}
+          {% if rubric.anchors.get(v) %}<span class="anchor">{{ rubric.anchors.get(v) }}</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="flag-box">
+      Problem with this idea?
+      <select name="flag">
+        <option value="">No problem</option>
+        <option value="invalid">Not a valid response</option>
+        <option value="off_task">Off task</option>
+        <option value="duplicate">Duplicate of another idea</option>
+        <option value="unclear">Too unclear to rate</option>
+      </select>
+      <input type="text" name="note" placeholder="Optional note" maxlength="500">
+    </div>
+    <div class="rate-actions">
+      <button class="btn" type="submit" name="action" value="submit">Submit and next</button>
+      <button class="btn btn-secondary" type="submit" name="action" value="skip" formnovalidate>Skip</button>
+    </div>
+  </section>
+</form>
+{% else %}
+<div class="placeholder-box">Nothing left for you to rate in this dataset. Thank you.</div>
+{% endif %}
+{% endblock %}

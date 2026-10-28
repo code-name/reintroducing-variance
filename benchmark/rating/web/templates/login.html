@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <form class="login-card" method="post" action="/login">
+    <h1>Idea rating</h1>
+    <p class="muted">Rate the novelty and usefulness of ideas for the OrgSci benchmark.</p>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <label>Username <input type="text" name="username" autofocus autocomplete="username" required></label>
+    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+    <button type="submit">Log in</button>
+  </form>
+</div>
+{% endblock %}

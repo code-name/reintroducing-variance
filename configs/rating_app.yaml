@@ -1,0 +1,27 @@
+# Rating app configuration. Committed and reviewed; no secrets here.
+# Secrets come from environment variables:
+#   ORGSCI_RATING_SESSION_SECRET   session signing key (on a server; locally a key is generated
+#                                  once into data/app/secret_key)
+#   ORGSCI_RATING_DEV_PASSWORD     overrides dev.dev_password below
+#   ORGSCI_RATING_CONFIG           path to an alternative config file
+
+bind:
+  host: 127.0.0.1
+  port: 8000
+
+db:
+  path: data/app/rating.db     # SQLite, WAL mode; gitignored
+data_dir: data/app
+rubrics_dir: configs/rubrics
+
+sampler:
+  target_raters_per_idea: 10   # coverage target k; per-dataset value overrides it
+
+# Localhost conveniences only. Never use these accounts or this password on a server.
+dev:
+  dev_password: change-me-locally
+  seed_users:
+    - {username: admin,  display_name: Admin,   role: admin}
+    - {username: rater1, display_name: Rater 1, role: rater, lab: McMaster, expertise: trained_novice}
+    - {username: rater2, display_name: Rater 2, role: rater, lab: McMaster, expertise: trained_novice}
+    - {username: rater3, display_name: Rater 3, role: rater, lab: McMaster, expertise: trained_novice}

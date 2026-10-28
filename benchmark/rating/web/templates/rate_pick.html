@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rate ideas</h1>
+<p class="muted">Pick a dataset.</p>
+<div class="cards">
+  {% for d in datasets %}
+  <a class="card" href="/rate?dataset={{ d.name }}"><h2>{{ d.name }}</h2><p>{{ d.description or '' }}</p></a>
+  {% else %}
+  <div class="placeholder-box">No dataset is open for rating.</div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+reintroducing-variance
+Copyright (c) 2026 Goran Calic and contributors
+
+The rating platform in benchmark/rating/ adapts design and code from two internal NSDA Corp
+applications, nsdalab_ocr_labelling_app and nsdalab_regdoc-requirements_labelling_app
+(multi-user annotation with provenance, content-hashed configurations, the coverage sampler,
+the export API with HTTP Basic auth, the CLI, the web shell, stylesheet and layout script).
+NSDA Corp, through its owner and founder Goran Calic, released this material for use in this
+repository under the MIT License on 2026-10-22. No NSDA Corp data, documents or
+regulatory-domain code are included.
+
+We thank the NSDA lab team who designed and built the original applications.

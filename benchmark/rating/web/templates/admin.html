@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin</h1>
+<div class="cards">
+  <a class="card" href="/admin/datasets"><h2>Datasets</h2><p>{{ stats.datasets }} datasets · {{ stats.ideas }} ideas · {{ stats.rubrics }} rubrics.</p></a>
+  <a class="card" href="/admin/analytics"><h2>Analytics</h2><p>{{ stats.ratings }} ratings · {{ stats.flags }} flags.</p></a>
+  <a class="card" href="/admin/runs"><h2>Judge runs</h2><p>{{ stats.judge_runs }} runs imported.</p></a>
+  <a class="card" href="/admin/users"><h2>Users</h2><p>{{ stats.raters }} raters (including imported).</p></a>
+  <a class="card" href="/admin/exports"><h2>Exports</h2><p>ideas, tasks, ratings and judge scores as CSV.</p></a>
+</div>
+{% endblock %}

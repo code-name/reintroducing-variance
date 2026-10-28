@@ -1,0 +1,51 @@
+id: pointwise_batch
+version: "1.1"
+status: draft
+created: "2026-10-22"
+changelog:
+  - "1.1 (2026-10-22): batch form of pointwise_v1.1 for perturbation P4 (ideas rated together, order shuffled by seed)."
+
+description: >
+  Several ideas answering the same task, rated in one call. Used only for P4, to test whether a
+  score depends on the other ideas in the batch and on their order.
+
+variables:
+  - task_prompt
+  - idea_list            # "[1] idea text\n[2] idea text ..."
+  - instructions
+  - scale_min
+  - scale_max
+  - anchor_text
+  - statement_block
+  - json_item_format     # {"id": <number>, "novelty": <integer 1-5>, "usefulness": <integer 1-5>}
+
+defaults: {}
+
+system: |
+  You are rating ideas for a research study, as one of many independent raters.
+  Use only the scale you are given and reply with JSON and nothing else.
+
+user: |
+  The task the ideas answered:
+  "{task_prompt}"
+
+  The ideas:
+  {idea_list}
+
+  {instructions}
+  For each idea, rate your agreement with each statement on a scale from {scale_min} to {scale_max}, where {anchor_text}.
+
+  {statement_block}
+
+  Reply with a JSON list only, one object per idea, in exactly this form:
+  [{json_item_format}, ...]
+
+output_schema:
+  type: array
+  required: ["id", "<one key per rubric dimension>"]
+  note: one object per idea; id is the bracketed number in the list
+
+run_defaults:
+  temperature: 0.0
+  max_tokens: 2000
+  n_samples: 1

@@ -1,0 +1,28 @@
+# Data folders you add: never committed (data/app/ holds rater data from the rating app)
+data/raw/
+data/processed/
+data/app/
+data/release/
+
+# Outputs: the model-call cache (it contains idea text), judge runs, diagnostics and figures
+results/*
+!results/README.md
+
+# Secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+
+node_modules/

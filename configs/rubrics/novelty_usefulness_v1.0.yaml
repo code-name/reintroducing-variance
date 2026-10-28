@@ -1,0 +1,26 @@
+# Rater rubric. Identity is the sha256 of the canonical form: any edit makes a new rubric, so
+# never edit a released version; copy it to a new version number instead.
+id: novelty_usefulness
+version: "1.0"
+status: draft
+changelog:
+  - "1.0 (2026-10-22): first draft. Two statements, novelty and usefulness, on a 1-5 agree/disagree scale."
+instructions: |
+  Read the task and the idea. Rate how much you agree with each statement.
+  Rate the two statements independently: an idea can be novel and useless, or useful and ordinary.
+  Rate the idea as written. Do not search for it or ask anyone.
+scale_min: 1
+scale_max: 5
+anchors:
+  1: strongly disagree
+  2: disagree
+  3: neither
+  4: agree
+  5: strongly agree
+dimensions:
+  - id: novelty
+    label: Novelty
+    statement: This idea is novel.
+  - id: usefulness
+    label: Usefulness
+    statement: This idea is useful.

@@ -1,0 +1,49 @@
+id: reword
+version: "1.0"
+status: draft
+created: "2026-10-26"
+changelog:
+  - "1.0 (2026-10-26): first version. Asks a model to paraphrase each rubric statement without changing what it measures; the output becomes the P1 variants of a new perturbation set."
+
+description: >
+  Generator prompt for the stability module. A model rewrites the rubric's statements in ways that
+  should not change a careful rater's scores. The rewordings are written to a versioned
+  perturbation file, with the generating model and this prompt recorded, so every later run uses
+  the same frozen text.
+
+variables:
+  - instructions      # the rubric instructions, verbatim
+  - statement_block   # one line per dimension: "novelty: This idea is novel."
+  - n_variants
+  - json_format       # [{"novelty": "...", "usefulness": "..."}, ...]
+
+defaults: {}
+
+system: |
+  You help build a measurement instrument. You rewrite rating statements so that they keep exactly
+  the same meaning. Reply with JSON and nothing else.
+
+user: |
+  Raters see these instructions:
+  "{instructions}"
+
+  and rate their agreement with each statement:
+  {statement_block}
+
+  Write {n_variants} different rewordings of the full set of statements. Each rewording must ask
+  about exactly the same quality as the original, at the same strength, and must not add examples,
+  criteria or hints about what a good idea looks like. Vary the wording and sentence structure,
+  not the meaning. Keep each statement to one sentence.
+
+  Reply with JSON only, a list of {n_variants} objects in exactly this form:
+  {json_format}
+
+output_schema:
+  type: array
+  required: ["<one string per rubric dimension, in every object>"]
+  note: one object per variant; keys are the rubric's dimension ids; values are single sentences
+
+run_defaults:
+  temperature: 0.7
+  max_tokens: 800
+  n_samples: 1

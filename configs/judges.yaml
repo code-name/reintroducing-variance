@@ -1,0 +1,24 @@
+# AI judges and run plan. Models are called through OpenRouter (OPENROUTER_API_KEY in .env).
+# Prices are OpenRouter list prices on 2026-10-22, USD per million tokens, for the cost estimate only;
+# actual spend is taken from the cost OpenRouter reports for each call.
+# Model ids are pinned; OpenRouter records which provider served each call and that is cached with it.
+
+rubric: configs/rubrics/novelty_usefulness_v1.0.yaml
+budget_usd: 300          # hard stop for a run (override with JUDGE_BUDGET_USD)
+
+judges:
+  # Closed frontier models: the three that management researchers are most likely to use.
+  - {label: claude-opus-5.5,   model: anthropic/claude-opus-5.5,   kind: closed,      reasoning_effort: low, price_in_per_m: 4.00, price_out_per_m: 20.00}
+  - {label: gpt-6.1-sol,       model: openai/gpt-6.1-sol,          kind: closed,      reasoning_effort: low, price_in_per_m: 2.00, price_out_per_m: 10.00}
+  - {label: gemini-4-argon,    model: google/gemini-4-argon,       kind: closed,      reasoning_effort: low, price_in_per_m: 2.00, price_out_per_m: 10.00}
+  # Open-weight models: the reproducibility path. Weights are public (Hugging Face ids below), so the
+  # whole grid can be re-run locally without any provider.
+  - {label: deepseek-v4-pro,   model: deepseek/deepseek-v4-pro-0813, kind: open-weight, hf: deepseek-ai/DeepSeek-V4-Pro-0813, reasoning_effort: low, price_in_per_m: 0.66, price_out_per_m: 1.98}
+  - {label: qwen3.8-27b,       model: qwen/qwen3.8-27b,            kind: open-weight, hf: Qwen/Qwen3.8-27B, reasoning_effort: low, price_in_per_m: 0.04, price_out_per_m: 1.35}
+
+runs:
+  # The example folder under the full stability grid: every judge is placed among the human raters
+  # and tested on the contested ideas. Add a run per data folder.
+  - dataset: examples/alternative_uses
+    perturbations: [P0_baseline, P1_rubric_reworded, P2_dimension_order_swapped, P3_anchors_removed,
+                    P4_batch_order_shuffled, P5_few_shot, P6_temperature_sampled]

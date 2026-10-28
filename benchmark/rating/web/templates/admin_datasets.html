@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Datasets</h1>
+{% if msg %}<div class="alert alert-ok">{{ msg }}</div>{% endif %}
+<table class="table">
+  <thead><tr><th>Name</th><th>Rubric</th><th>Ideas</th><th>Ratings</th><th>Raters</th><th>At target</th><th>Splits</th><th>Upload CSV</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>
+    <td>{{ r.ds.name }}</td>
+    <td>{{ r.rubric.rubric_id }}_v{{ r.rubric.version }}</td>
+    <td>{{ r.cov.ideas }}</td><td>{{ r.cov.ratings }}</td><td>{{ r.cov.raters }}</td>
+    <td>{{ r.cov.at_target }} / {{ r.cov.ideas }} (k={{ r.cov.target }})</td>
+    <td>{% for k, v in r.cov.by_split.items() %}{{ k }} {{ v }}{{ ', ' if not loop.last }}{% endfor %}</td>
+    <td>
+      {% for kind in ['tasks', 'ideas', 'ratings'] %}
+      <form method="post" action="/admin/datasets/{{ r.ds.id }}/upload?kind={{ kind }}" enctype="multipart/form-data" class="form-row">
+        <input type="file" name="file" accept=".csv" required><button class="btn btn-secondary" type="submit">{{ kind }}</button>
+      </form>
+      {% endfor %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">No datasets yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Create a dataset</h2>
+<form method="post" action="/admin/datasets/create" class="form-row">
+  <input type="text" name="name" placeholder="name" required>
+  <select name="rubric_sha256" required>
+    {% for rb in rubrics %}<option value="{{ rb.sha256 }}">{{ rb.rubric_id }}_v{{ rb.version }}</option>{% endfor %}
+  </select>
+  <input type="number" name="target_raters" min="1" max="100" placeholder="raters per idea">
+  <button class="btn" type="submit">Create</button>
+</form>
+
+<h2>Register a rubric</h2>
+<form method="post" action="/admin/rubrics/upload" enctype="multipart/form-data" class="form-row">
+  <input type="file" name="file" accept=".yaml,.yml" required><button class="btn btn-secondary" type="submit">Upload YAML</button>
+</form>
+<p class="muted small-note">Import order: tasks, then ideas, then any historical ratings. Columns follow the README's "Bring your own ratings" format.</p>
+{% endblock %}

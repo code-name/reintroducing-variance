@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<p class="muted">Welcome, {{ user.display_name }}.</p>
+<div class="cards">
+  {% for p in progress %}
+  <a class="card" href="/rate?dataset={{ p.dataset.name }}">
+    <h2>{{ p.dataset.name }}</h2>
+    <p>You have rated {{ p.done }} idea{{ '' if p.done == 1 else 's' }}. {{ 'Open for rating.' if p.dataset.status == 'open' else 'Closed.' }}</p>
+  </a>
+  {% else %}
+  <div class="placeholder-box">No datasets yet.</div>
+  {% endfor %}
+  {% if user.role == 'admin' %}
+  <a class="card" href="/admin"><h2>Admin</h2><p>Datasets, analytics, judge runs, users, exports.</p></a>
+  {% endif %}
+</div>
+{% endblock %}

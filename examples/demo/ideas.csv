@@ -1,0 +1,7 @@
+idea_id,idea_text,task_id,source,model_name,model_version,generation_condition,split
+d001,Use it as a doorstop.,aut_brick,human,,,,calibration
+d002,Grind it into pigment for terracotta-coloured paint.,aut_brick,ai,demo-model,0,demo,calibration
+d003,Drill holes in it and use it as a bee hotel for solitary bees.,aut_brick,human,,,,heldout
+d004,A follow-up phone call from a nurse two days after discharge.,biz_hospital,human,,,,calibration
+d005,A shared ride service that brings patients back for follow-up visits at off-peak hours.,biz_hospital,ai,demo-model,0,demo,calibration
+d006,A lending library of home medical equipment run by former patients.,biz_hospital,human,,,,heldout

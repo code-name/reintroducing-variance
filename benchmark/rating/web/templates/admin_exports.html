@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Exports</h1>
+<p class="muted">CSV in the benchmark's long format, with raters pseudonymised. The same URLs work from scripts with HTTP Basic auth. For a publishable package with held-out scores withheld, run <code>python -m benchmark.rating.cli export --dataset NAME --release</code>.</p>
+<table class="table">
+  <thead><tr><th>Dataset</th><th>Ideas</th><th>Tasks</th><th>Ratings (all)</th><th>Ratings (calibration)</th><th>Judge scores</th></tr></thead>
+  <tbody>
+  {% for d in datasets %}
+  <tr><td>{{ d.name }}</td>
+    <td><a href="/api/export/ideas.csv?dataset={{ d.name }}">ideas.csv</a></td>
+    <td><a href="/api/export/tasks.csv?dataset={{ d.name }}">tasks.csv</a></td>
+    <td><a href="/api/export/ratings.csv?dataset={{ d.name }}">ratings.csv</a></td>
+    <td><a href="/api/export/ratings.csv?dataset={{ d.name }}&split=calibration">ratings_calibration.csv</a></td>
+    <td><a href="/api/export/judge_scores.csv?dataset={{ d.name }}">judge_scores.csv</a></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

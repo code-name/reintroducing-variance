@@ -1,0 +1,51 @@
+id: perturbations
+version: "1.1"
+status: draft
+created: "2026-10-22"
+base_prompt: pointwise_v1.1
+changelog:
+  - "1.1 (2026-10-22): stability grid only. P1 paraphrases are written against the shared rubric's statements."
+
+description: >
+  Changes to the prompt that should not change a careful rater's scores. Every judge is run under
+  each perturbation; drift is reported per perturbation as mean absolute change from P0 and the
+  change in agreement with the human reference. For human raters the analogue is test-retest.
+
+perturbations:
+  - id: P0_baseline
+    description: The base prompt, zero-shot, temperature 0, one idea per call.
+    transform: none
+
+  - id: P1_rubric_reworded
+    description: The dimension statements are paraphrased with the same meaning. Three variants, each run separately.
+    transform: reword_rubric
+    variants:
+      a: {novelty: "This idea is original and unusual.", usefulness: "This idea is practical and would work."}
+      b: {novelty: "I have not seen an idea like this before.", usefulness: "This idea would be valuable if someone carried it out."}
+      c: {novelty: "The idea is uncommon for this task.", usefulness: "The idea is feasible and worth doing."}
+
+  - id: P2_dimension_order_swapped
+    description: The dimensions are asked in reverse order, in the statements and in the JSON format.
+    transform: swap_dimensions
+
+  - id: P3_anchors_removed
+    description: The scale is given as numbers only; the verbal anchors are removed.
+    transform: remove_anchors
+
+  - id: P4_batch_order_shuffled
+    description: Ideas for the same task are rated together in batches of up to 10, membership and order shuffled under five seeds.
+    transform: batch_shuffle
+    params: {batch_size: 10, seeds: [1, 2, 3, 4, 5]}
+
+  - id: P5_few_shot
+    description: >
+      Three worked examples (the lowest, middle and highest human-rated ideas on novelty for the
+      dataset, with their rounded human mean scores) are shown first. Those three ideas are
+      excluded from scoring and from agreement statistics for this perturbation. Needs human ratings.
+    transform: few_shot
+    params: {n_examples: 3}
+
+  - id: P6_temperature_sampled
+    description: Run setting, not prompt text. The base prompt at temperature 1.0, five samples per idea. Gives each judge's own spread per idea, used for the contested-idea test.
+    transform: none
+    run_overrides: {temperature: 1.0, n_samples: 5}

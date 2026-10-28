@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reintroducing-variance"
+version = "0.3.0"
+description = "Reintroducing variance into idea evaluation: an open instrument for trusting AI judges"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Goran Calic" }, { name = "Alex Thabane" }, { name = "Vikram Arora" }]
+# Exact pins live in requirements.txt; install with `pip install -r requirements.txt` then `pip install -e . --no-deps`.
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["benchmark*"]
+
+[tool.setuptools.package-data]
+"benchmark" = ["prompts/*.yaml", "prompts/*.md"]
+"benchmark.rating.web" = ["templates/*.html", "static/css/*.css", "static/js/*.js"]

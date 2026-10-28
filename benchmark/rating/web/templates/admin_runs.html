@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Judge runs</h1>
+<p class="muted">AI judge scores imported with <code>python -m benchmark.rating.cli import-judge-scores</code>. Each run is identified by the sha256 of its configuration.</p>
+<table class="table">
+  <thead><tr><th>Name</th><th>Dataset</th><th>Model</th><th>Prompt</th><th>Perturbation</th><th>Temp.</th><th>Scores</th><th>Config hash</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td>{{ r.run.name }}</td><td>{{ r.dataset }}</td><td>{{ r.run.model_name }} {{ r.run.model_version or '' }}</td><td>{{ r.run.prompt_name }}</td><td>{{ r.run.perturbation_id }}</td><td>{{ r.run.temperature }}</td><td>{{ r.scores }}</td><td><code>{{ r.run.config_sha256[:12] }}</code></td></tr>
+  {% else %}
+  <tr><td colspan="8" class="muted">No judge runs yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
