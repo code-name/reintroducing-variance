@@ -139,7 +139,7 @@ For real data, use your own folder and leave out `--backend fake`.
 
 `benchmark/rating/` is a self-hosted web app and CLI for collecting human ratings, adapted from NSDA Corp's annotation apps (see `NOTICE`). Raters rate blind, each idea gets 10 raters by default, and release exports withhold held-out scores.
 
-To load the invented data in `examples/demo/`, run these after the commands in [Start the rating app](#start-the-rating-app):
+To load the invented data in `examples/demo/`, stop the app with `Ctrl+C`, then run:
 
 ```powershell
 python -m benchmark.rating.cli add-rubric --file configs/rubrics/novelty_usefulness_v1.0.yaml
@@ -147,6 +147,12 @@ python -m benchmark.rating.cli create-dataset --name demo --rubric novelty_usefu
 python -m benchmark.rating.cli import-tasks   --dataset demo --file examples/demo/tasks.csv
 python -m benchmark.rating.cli import-ideas   --dataset demo --file examples/demo/ideas.csv
 python -m benchmark.rating.cli import-ratings --dataset demo --file examples/demo/ratings_long.csv
+python -m benchmark.rating.cli serve
+```
+
+To export the ratings:
+
+```powershell
 python -m benchmark.rating.cli export --dataset demo            # everything, to data/processed/demo/
 python -m benchmark.rating.cli export --dataset demo --release  # publishable, to data/release/demo/
 ```
