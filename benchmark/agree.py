@@ -126,6 +126,8 @@ def rater_report(ratings: pd.DataFrame, reference_conditions: set[str] | None = 
     """Leniency, noise and agreement for every rater (human or judge) against a leave-one-out
     reference built from ``reference_conditions`` (all raters if None)."""
     pool = ratings if reference_conditions is None else ratings[ratings.condition.isin(reference_conditions)]
+    if "condition" in pool:  # judges are placed among the humans, never part of their reference
+        pool = pool[pool.condition != "judge"]
     sums = pool.groupby(["idea_id", "dimension"]).score.agg(["sum", "count"])
     rows = []
     for (rater, dim), sub in ratings.groupby(["rater_id", "dimension"]):

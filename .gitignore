@@ -6,6 +6,11 @@ data/release/
 data/*
 !data/README.md
 
+# The README's example folder names, for work on your own data
+/my_study/
+/my_screen/
+/my_rubric.yaml
+
 # Outputs: the model-call cache (it contains idea text), judge runs, diagnostics and figures
 results/*
 !results/README.md

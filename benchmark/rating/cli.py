@@ -9,7 +9,7 @@
     python -m benchmark.rating.cli import-ideas   --dataset demo --file ideas.csv
     python -m benchmark.rating.cli import-ratings --dataset demo --file ratings_long.csv
     python -m benchmark.rating.cli import-judge-scores --dataset demo --file scores.csv --name run1 \
-        --backend openai --model-name M --prompt pointwise_v1.0 [--model-version V]
+        --backend openrouter --model-name M --prompt pointwise_v1.1 [--model-version V]
     python -m benchmark.rating.cli coverage --dataset demo
     python -m benchmark.rating.cli export --dataset demo [--release] [--out DIR]
     python -m benchmark.rating.cli serve [--port 8000]
@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:  # noqa: C901 - flat command dis
     j.add_argument("--backend", required=True)
     j.add_argument("--model-name", required=True)
     j.add_argument("--model-version", default=None)
-    j.add_argument("--prompt", required=True, help="judge prompt name, e.g. pointwise_v1.0")
+    j.add_argument("--prompt", required=True, help="judge prompt name, e.g. pointwise_v1.1")
     j.add_argument("--perturbation", default="P0_baseline")
     j.add_argument("--temperature", type=float, default=0.0)
     cv = sub.add_parser("coverage")
