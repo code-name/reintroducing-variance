@@ -41,6 +41,16 @@ pytest                         # the tests
 
 `examples/alternative_uses/` has 15 ideas, synthetic ratings from 39 raters and saved scores from five AI judges. Use it to test the tools, not to estimate anything. `benchmark.variance` may print a `ConstantInputWarning` on this small sample; it is safe to ignore.
 
+Start the rating app (no API key):
+
+```bash
+python -m benchmark.rating.cli init-db          # first time only
+python -m benchmark.rating.cli seed-dev-users   # test logins, localhost only
+python -m benchmark.rating.cli serve
+```
+
+Open http://127.0.0.1:8000 and log in as `admin` or `rater1`. The password is in `configs/rating_app.yaml`. The app starts empty; to load data, see [The rating platform](#the-rating-platform).
+
 ## When you need an API key
 
 An [OpenRouter](https://openrouter.ai) key is required only for commands that call a model. One key covers all five judges.
