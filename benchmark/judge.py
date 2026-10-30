@@ -183,11 +183,12 @@ class OpenRouterBackend:
         if self.reasoning_effort:
             extra["reasoning"] = {"effort": self.reasoning_effort, "exclude": True}
         dropped = False
+        limit = max_tokens
 
         @retry(stop=stop_after_attempt(5), wait=wait_exponential(min=2, max=60),
                retry=retry_if_not_exception_type(BadRequestError), reraise=True)
         def call(with_temperature: bool):
-            kwargs: dict[str, Any] = {"model": self.model, "max_tokens": max_tokens, "extra_body": extra,
+            kwargs: dict[str, Any] = {"model": self.model, "max_tokens": limit, "extra_body": extra,
                                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
             if with_temperature:
                 kwargs["temperature"] = temperature
@@ -199,9 +200,16 @@ class OpenRouterBackend:
             if "temperature" not in str(exc).lower():
                 raise
             resp, dropped = call(False), True
+        spent = 0.0
+        choice = resp.choices[0] if resp.choices else None
+        if choice is None or not choice.message.content or choice.finish_reason == "length":
+            # A reasoning model can use up the limit before it replies: try once with more room.
+            spent = float((resp.usage.model_dump() if resp.usage else {}).get("cost") or 0.0)
+            limit = max_tokens * 4
+            resp = call(not dropped)
         usage = resp.usage.model_dump() if resp.usage else {}
         return {"text": (resp.choices[0].message.content or "") if resp.choices else "", "usage": usage,
-                "cost_usd": float(usage.get("cost") or 0.0), "provider": getattr(resp, "provider", None),
+                "cost_usd": spent + float(usage.get("cost") or 0.0), "provider": getattr(resp, "provider", None),
                 "model_served": resp.model, "temperature_dropped": dropped}
 
 

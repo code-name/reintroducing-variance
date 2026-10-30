@@ -1,6 +1,6 @@
 """Import tasks, ideas, historical ratings and judge scores from CSV.
 
-Column names follow the "Bring your own ratings" format in the README, so a lab's existing
+Column names follow the "Run it on your own ideas" format in the README, so a lab's existing
 export loads without reshaping. Every import is idempotent on its natural keys and records its
 source file in ``source`` columns and in the audit log.
 """

@@ -3,6 +3,8 @@ data/raw/
 data/processed/
 data/app/
 data/release/
+data/*
+!data/README.md
 
 # Outputs: the model-call cache (it contains idea text), judge runs, diagnostics and figures
 results/*

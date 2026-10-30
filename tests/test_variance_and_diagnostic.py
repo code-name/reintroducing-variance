@@ -1,13 +1,14 @@
 """The AI judge diagnostic, the bring-your-own-data path, model-written rewordings, the variance
 pipeline and the field test. Everything runs offline on the example folders and the demo data."""
 import shutil
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from benchmark import PROMPTS_DIR, REPO_DIR, agree, shadow, variance
-from benchmark.judge import DiskCache, FakeBackend, dataset_tables, load_rubric, run
+from benchmark.judge import DiskCache, FakeBackend, OpenRouterBackend, dataset_tables, load_rubric, run
 from benchmark.perturb import (DEFAULT_SET, _FakeReworder, generate_rewordings, load_perturbations, plan_jobs,
                                write_perturbation_set)
 
@@ -113,6 +114,37 @@ def test_reword_writes_a_new_versioned_file(tmp_path):
     with pytest.raises(FileExistsError):
         write_perturbation_set(variants, prov, out_name="perturbations_v9.9", prompts_dir=tmp_path)
     assert out.exists()
+
+
+def test_an_unusable_rewording_is_retried_and_not_cached(tmp_path):
+    class Flaky(_FakeReworder):
+        calls = 0
+
+        def complete(self, *args, **kwargs):
+            Flaky.calls += 1
+            reply = super().complete(*args, **kwargs)
+            return {**reply, "text": ""} if Flaky.calls == 1 else reply
+
+    rubric, _ = load_rubric(RUBRIC)
+    cache = DiskCache(tmp_path / "cache")
+    assert len(generate_rewordings(rubric, Flaky(), n=3, cache=cache)[0]) == 3 and Flaky.calls == 2
+    assert len(generate_rewordings(rubric, Flaky(), n=3, cache=cache)[0]) == 3 and Flaky.calls == 2
+
+
+def test_a_reply_cut_off_by_the_token_limit_is_retried_with_more_room():
+    limits = []
+
+    def create(**kwargs):
+        limits.append(kwargs["max_tokens"])
+        first = len(limits) == 1
+        choice = SimpleNamespace(message=SimpleNamespace(content="" if first else "{}"), finish_reason="length" if first else "stop")
+        return SimpleNamespace(choices=[choice], usage=SimpleNamespace(model_dump=lambda: {"cost": 0.01}), model="m")
+
+    backend = OpenRouterBackend.__new__(OpenRouterBackend)
+    backend.model, backend.reasoning_effort = "m", None
+    backend.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    reply = backend.complete("s", "u", temperature=0.0, max_tokens=800)
+    assert limits == [800, 3200] and reply["text"] == "{}" and reply["cost_usd"] == pytest.approx(0.02)
 
 
 def test_variance_sources_and_reliability(example_run):

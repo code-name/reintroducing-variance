@@ -4,7 +4,7 @@ import pytest
 
 from benchmark import REPO_DIR, agree, load
 from benchmark.judge import DiskCache, FakeBackend, load_rubric, parse_batch, parse_scores, run
-from benchmark.perturb import load_perturbations, plan_jobs
+from benchmark.perturb import few_shot_examples, load_perturbations, plan_jobs
 
 EXAMPLE = REPO_DIR / "examples" / "alternative_uses"
 RUBRIC = REPO_DIR / "configs" / "rubrics" / "novelty_usefulness_v1.0.yaml"
@@ -53,6 +53,13 @@ def test_plan_jobs_cover_grid(ratings):
     assert by["P5_few_shot"] == 12                       # three example ideas excluded
     swapped = next(j for j in jobs if j["perturbation_id"] == "P2_dimension_order_swapped")
     assert swapped["values"]["statement_block"].startswith("Statement 1 (usefulness)")
+
+
+def test_few_shot_examples_work_without_a_novelty_dimension(ratings):
+    renamed = ratings.assign(dimension=ratings.dimension.map({"novelty": "originality", "usefulness": "feasibility"}))
+    ideas = pd.read_csv(EXAMPLE / "ideas.csv")
+    block, picks = few_shot_examples(agree.reference(renamed), ideas, ["originality", "feasibility"])
+    assert len(picks) == 3 and '"originality"' in block
 
 
 def test_run_with_fake_backend_uses_cache(tmp_path, ratings):

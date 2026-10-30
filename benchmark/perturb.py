@@ -79,11 +79,11 @@ def rubric_values(rubric, *, statements: dict[str, str] | None = None, swap: boo
 
 
 def few_shot_examples(reference: pd.DataFrame, ideas: pd.DataFrame, dims: list[str], n: int = 3,
-                      sort_dim: str = "novelty") -> tuple[str, list[str]]:
-    """Lowest, middle and highest ideas on ``sort_dim`` by human mean, rendered as a worked-example
-    block. Returns (block, idea_ids used)."""
+                      sort_dim: str | None = None) -> tuple[str, list[str]]:
+    """Lowest, middle and highest ideas on ``sort_dim`` (default: the first dimension) by human
+    mean, rendered as a worked-example block. Returns (block, idea_ids used)."""
     wide = reference.pivot_table(index="idea_id", columns="dimension", values="mean").dropna()
-    wide = wide.sort_values(sort_dim)
+    wide = wide.sort_values(sort_dim or dims[0])
     picks = [wide.index[0], wide.index[len(wide) // 2], wide.index[-1]][:n]
     text = ideas.set_index("idea_id").idea_text
     lines = ["Here are three ideas with the average scores that other raters gave them:"]
@@ -171,8 +171,9 @@ def dumps(job: dict) -> str:
 
 def generate_rewordings(rubric, backend, *, n: int = 3, cache=None, prompt_name: str = "reword_v1.0") -> tuple[list[dict[str, str]], dict]:
     """Ask ``backend`` for ``n`` rewordings of the rubric's statements. Returns (variants,
-    provenance). Each variant maps dimension id to a statement. The call is cached like any judge
-    call, so re-running with the same model and rubric returns the same text."""
+    provenance). Each variant maps dimension id to a statement. A usable reply is cached like any
+    judge call, so re-running with the same model and rubric returns the same text; an unusable
+    one is not cached, so a failed run can simply be repeated."""
     from .judge import DiskCache, cache_key, load_prompt, render_prompt
 
     spec = load_prompt(prompt_name)
@@ -187,11 +188,15 @@ def generate_rewordings(rubric, backend, *, n: int = 3, cache=None, prompt_name:
     cache = cache or DiskCache()
     key = cache_key(backend.name, backend.model, spec.name, "reword", system, user, temperature, 0)
     rec = cache.get(spec.name, key)
-    if rec is None:
+    variants = _parse_rewordings(rec["text"], dims) if rec else []
+    for _ in range(3):
+        if len(variants) >= n:
+            break
         rec = {"model": backend.model, "prompt": spec.name, "system": system, "user": user,
                **backend.complete(system, user, temperature=temperature, max_tokens=int(spec.run_defaults.get("max_tokens", 800)))}
-        cache.put(spec.name, key, rec)
-    variants = _parse_rewordings(rec["text"], dims)
+        variants = _parse_rewordings(rec["text"], dims)
+        if len(variants) >= n:
+            cache.put(spec.name, key, rec)
     if len(variants) < n:
         raise ValueError(f"model returned {len(variants)} usable rewordings, needed {n}: {rec['text'][:300]}")
     prov = {"generator_backend": backend.name, "generator_model": rec.get("model_served") or backend.model,

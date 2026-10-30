@@ -6,21 +6,16 @@ numpy==2.4.6
 pandas==2.3.3
 scipy==1.17.1
 pingouin==0.6.1          # ICC(2,k) and friends
-krippendorff==0.8.2      # Krippendorff's alpha with the model as an extra rater
 
 # Plotting
 matplotlib==3.10.9
 
-# Config, prompts, retries, secrets
+# Config, prompts, retries
 PyYAML==6.0.3
 tenacity==9.1.4
-python-dotenv==1.2.3
-tqdm==4.69.1
 
-# Model backends. The OpenAI client also serves any OpenAI-compatible endpoint
-# (local Ollama / vLLM or a hosted open-weight model), which is the reproducibility path.
+# Model calls. The OpenAI client reaches every judge through OpenRouter.
 openai==2.54.0
-anthropic==1.6.0
 
 # Rating platform (benchmark.rating; plumbing adapted from NSDA Corp, see NOTICE)
 fastapi==0.141.1
