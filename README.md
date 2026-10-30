@@ -101,7 +101,7 @@ python -m benchmark.variance --data-dir my_study/
 - **Budget:** `JUDGE_BUDGET_USD` in `.env` sets a hard spend limit.
 - **Caching:** every call is cached, so reruns do not pay twice.
 - **Outputs** go to `results/`.
-- **Privacy:** data stays on your machine. Only prompts leave it, sent to OpenRouter and the model provider. Local open-weight models are planned, so that nothing leaves the machine.
+- **Privacy:** see [Data privacy](#data-privacy) before sending confidential ideas.
 
 ## How the diagnostic works
 
@@ -163,6 +163,39 @@ python -m benchmark.rating.cli serve                   # http://127.0.0.1:8000, 
 python -m benchmark.rating.cli export --dataset demo           # everything, to data/processed/demo/
 python -m benchmark.rating.cli export --dataset demo --release # publishable, to data/release/demo/
 ```
+
+## Data privacy
+
+The tool runs on your machine and your data is not shared with the authors. Only calls to a real AI judge send data out.
+
+| Step | What leaves your machine |
+|---|---|
+| `judge run` | The task, rubric and idea text. The P5 test adds other ideas with their human mean scores |
+| `variance run` | The same, and rater twins add one rater's scores on other ideas, without the rater's identity |
+| `perturb reword` | The rubric, with no ideas or ratings |
+| Everything else, and `--backend fake` | Nothing |
+
+Prompts go to OpenRouter and the model provider. The tool sets no data-retention options, so check their terms before sending confidential ideas, such as an organization's submissions in the field test.
+
+- **Stored locally:** prompts and replies are cached in `results/cache/`, so the cache contains idea text.
+- **Kept out of git:** `data/` (including the rating database), `results/` and `.env`.
+- **Raters:** use a code for `rater_id`, not a name. Rating exports replace usernames with pseudonyms.
+
+## Forking and extending
+
+The code is MIT licensed, so you can fork and adapt it. Keep the `LICENSE` and `NOTICE` files.
+
+- **New rubric or judge:** no code needed. Add a rubric YAML file, or add any OpenRouter model to `configs/judges.yaml`.
+- **Local model or another provider:** add a backend class in `benchmark/judge.py`. Every model call goes through its `complete()` method, which returns the reply, usage and cost. `OpenRouterBackend` is the reference, and `FakeBackend` is the smallest example. Add it to the `--backend` option and give it its own cache folder, as `fake` does.
+- **Private work:** a fork of a public repository is public. Keep data in `data/` and `results/`, or work in a separate private repository.
+- **Comparable results:** do not edit released prompt files; add a new version. Report the commit you ran.
+
+## Roadmap
+
+The tool is designed to run beyond OpenRouter. Planned:
+
+- Local open-weight models, so that nothing leaves the machine
+- Direct APIs for other model providers
 
 ## What's in the repository
 
