@@ -12,7 +12,7 @@ samples. High points are contested ideas.
     python -m benchmark.figures                         # the example folder
     python -m benchmark.figures --data-dir my_study/    # ratings_long.csv and judge_scores.csv
 
-Palette: the dataviz reference categorical slots (validated, light mode).
+Palette: a categorical palette checked for contrast on a light background.
 """
 from __future__ import annotations
 

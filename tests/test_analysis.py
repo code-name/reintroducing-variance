@@ -55,6 +55,15 @@ def test_plan_jobs_cover_grid(ratings):
     assert swapped["values"]["statement_block"].startswith("Statement 1 (usefulness)")
 
 
+def test_judges_are_compared_with_humans_only(ratings):
+    judges = pd.read_csv(EXAMPLE / "judge_scores.csv")
+    base = judges[(judges.perturbation_id == "P0_baseline") & (judges.sample_index == 0)]
+    human = ratings.groupby(["idea_id", "dimension"]).score.mean().rename("human").reset_index()
+    gap = base.merge(human, on=["idea_id", "dimension"]).assign(gap=lambda m: m.score - m.human).groupby(["judge", "dimension"]).gap.mean()
+    for row in agree.judge_position(ratings, judges).itertuples():
+        assert row.leniency == pytest.approx(gap[(row.judge, row.dimension)])
+
+
 def test_few_shot_examples_work_without_a_novelty_dimension(ratings):
     renamed = ratings.assign(dimension=ratings.dimension.map({"novelty": "originality", "usefulness": "feasibility"}))
     ideas = pd.read_csv(EXAMPLE / "ideas.csv")

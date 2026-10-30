@@ -18,7 +18,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Run every command from this folder with `.venv` active. In a new terminal, run `.venv\Scripts\Activate.ps1` again. If PowerShell blocks it, run `Set-ExecutionPolicy -Scope Process Bypass` first.
+Clone into a short folder path, because Windows limits path length. Run every command from this folder with `.venv` active. In a new terminal, run `.venv\Scripts\Activate.ps1` again. If PowerShell blocks it, run `Set-ExecutionPolicy -Scope Process Bypass` first.
 
 ### Run the example
 
@@ -39,7 +39,7 @@ No API key needed:
 
 ```powershell
 python -m benchmark.rating.cli init-db          # first time only
-python -m benchmark.rating.cli seed-dev-users   # test logins, localhost only
+python -m benchmark.rating.cli seed-dev-users   # test logins for your own computer only
 
 # The app starts empty, so load data (the invented demo here)
 python -m benchmark.rating.cli add-rubric --file configs/rubrics/novelty_usefulness_v1.0.yaml
@@ -97,7 +97,7 @@ Create a folder such as `my_study/` with three CSV files:
 
 | File | Columns |
 |---|---|
-| `ideas.csv` | `idea_id, idea_text, task_id`. `source` (`human` or `ai`) is required for the rating app. Optional: `split`, `target_raters`, `advanced` |
+| `ideas.csv` | `idea_id, idea_text, task_id`. `source` (`human` or `ai`) is required for the rating app. Optional: `split` (`calibration` or `heldout`), `target_raters`, `advanced` |
 | `tasks.csv` | `task_id, task_prompt_verbatim` |
 | `ratings_long.csv` | `idea_id, rater_id, dimension, score, scale_min, scale_max`. Optional: `condition` |
 
@@ -109,7 +109,7 @@ Use one row per idea, rater and dimension. Averaged scores are not enough.
 copy configs\rubrics\novelty_usefulness_v1.0.yaml my_rubric.yaml
 ```
 
-Edit the copy. Any dimensions and any scale work, but each dimension `id` must match the `dimension` column in `ratings_long.csv`. A mismatch gives no error: that dimension is left out of the report.
+Edit the copy. Any dimensions and any scale work, but each dimension `id` must match the `dimension` column in `ratings_long.csv`. A mismatch gives no error: that dimension is left out of the report. `benchmark.figures` draws the example's novelty figure only.
 
 ### 3. Run the commands
 
@@ -138,11 +138,11 @@ python -m benchmark.variance --data-dir my_study/
 
 **Always reword a new rubric.** If a rubric keeps the dimension names but changes their wording, the run does not fail: it silently uses the old rewordings, which invalidates the P1 stability test. `--out` needs a new name each time, because existing files are never overwritten.
 
-Outputs go to `results/`. Calls are cached, so reruns do not pay twice. `JUDGE_BUDGET_USD` in `.env` sets a hard spend limit.
+Outputs go to `results/`. Calls are cached, so reruns do not pay twice. `JUDGE_BUDGET_USD` in `.env` stops a run once it has spent that amount. The limit applies to each run, and calls already under way still finish.
 
 ## How it works
 
-Each box has the same name as a heading below. Dashed boxes are prototypes.
+Inputs are your ideas, tasks and rubric. Every other box has the same name as a heading below. Dashed boxes are prototypes.
 
 ```mermaid
 flowchart TD
@@ -184,7 +184,7 @@ flowchart TD
 
 ### The variance pipeline (prototype)
 
-`benchmark/variance.py` searches for a way to make AI judgment flag the ideas people would disagree about. It chooses the best candidate on some ideas, tests it on unseen ones, and returns a mean, a spread and a contested flag per idea. It needs many rated ideas; the example's 15 only demonstrate the steps.
+`benchmark/variance.py` searches for a way to make AI judgment flag the ideas people would disagree about. It chooses the best candidate on some ideas, tests it on unseen ones, and reports how well it finds the contested ideas. Producing a mean, a spread and a contested flag for each idea is in the code (`panel_output`), but has no command yet. It needs many rated ideas; the example's 15 only demonstrate the steps.
 
 ### The field test (prototype)
 
@@ -217,7 +217,7 @@ The tool sets no data-retention options, so check their terms before sending con
 The code is MIT licensed. Keep the `LICENSE` and `NOTICE` files.
 
 - **New rubric or judge:** no code needed. Add a rubric YAML file, or add an OpenRouter model to `configs/judges.yaml`.
-- **Local model or another provider:** add a backend class in `benchmark/judge.py`, using `OpenRouterBackend` and `FakeBackend` as examples. Add it to the `--backend` option and give it its own cache folder, as `fake` does.
+- **Local model or another provider:** add a backend class in `benchmark/judge.py`, using `OpenRouterBackend` and `FakeBackend` as examples. Add it to the `--backend` options in `judge.py`, `perturb.py` and `variance.py`, and give it its own cache folder, as `fake` does.
 - **Private work:** a fork of a public repository is public. Keep data in `data/` and `results/`, or use a separate private repository.
 
 ## Roadmap

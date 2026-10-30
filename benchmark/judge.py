@@ -2,9 +2,8 @@
 
 Prompts are versioned YAML (``benchmark/prompts/``) rendered from the same rubric the human raters
 see (``configs/rubrics/``). Judges are listed in ``configs/judges.yaml``. Every call is cached in
-``results/cache/<prompt>/<key>.json`` before it is used; the key hashes everything that could
-change the answer (backend, model, prompt, perturbation, rendered text, temperature, sample index),
-so re-running costs nothing and no call is ever made twice. Spend is tracked per call from the
+``results/cache/<prompt>/<key>.json`` before it is used; the key hashes the backend, model, prompt,
+perturbation, rendered text, temperature and sample index, so re-running costs nothing. Spend is tracked per call from the
 provider's reported cost and the run stops at ``JUDGE_BUDGET_USD``.
 
     python -m benchmark.judge plan                     # calls and estimated cost, no network
@@ -64,7 +63,7 @@ class PromptSpec:
 
 
 def load_prompt(name: str, prompts_dir: Path = PROMPTS_DIR) -> PromptSpec:
-    """Load ``<name>.yaml`` (e.g. ``pointwise_v1.0``) from the prompts directory.
+    """Load ``<name>.yaml`` (e.g. ``pointwise_v1.1``) from the prompts directory.
 
     Raises ``FileNotFoundError`` for an unknown name and ``ValueError`` if required keys are
     missing or the version in the file does not match the filename.

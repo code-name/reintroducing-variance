@@ -1,6 +1,6 @@
 """Coverage sampler: hands each rater the next idea to rate.
 
-Adapted from NSDA PLANNING 8.5. Policy (``coverage_v1``):
+Adapted from NSDA Corp (see NOTICE). Policy (``coverage_v1``):
 
 1. A rater with a pending assignment in the dataset gets that idea again (resume).
 2. Otherwise the candidates are ideas in the dataset that this rater has never been assigned and
