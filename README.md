@@ -79,7 +79,7 @@ Create a folder such as `my_study/` with three CSV files:
 
 | File | Columns |
 |---|---|
-| `ideas.csv` | `idea_id, idea_text, task_id`. Optional: `source`, `split`, `target_raters`, `advanced` |
+| `ideas.csv` | `idea_id, idea_text, task_id`. `source` (`human` or `ai`) is required for the rating app. Optional: `split`, `target_raters`, `advanced` |
 | `tasks.csv` | `task_id, task_prompt_verbatim` |
 | `ratings_long.csv` | `idea_id, rater_id, dimension, score, scale_min, scale_max`. Optional: `condition` |
 

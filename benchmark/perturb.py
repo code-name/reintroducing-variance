@@ -79,11 +79,11 @@ def rubric_values(rubric, *, statements: dict[str, str] | None = None, swap: boo
 
 
 def few_shot_examples(reference: pd.DataFrame, ideas: pd.DataFrame, dims: list[str], n: int = 3,
-                      sort_dim: str = "novelty") -> tuple[str, list[str]]:
-    """Lowest, middle and highest ideas on ``sort_dim`` by human mean, rendered as a worked-example
-    block. Returns (block, idea_ids used)."""
+                      sort_dim: str | None = None) -> tuple[str, list[str]]:
+    """Lowest, middle and highest ideas on ``sort_dim`` (default: the first dimension) by human
+    mean, rendered as a worked-example block. Returns (block, idea_ids used)."""
     wide = reference.pivot_table(index="idea_id", columns="dimension", values="mean").dropna()
-    wide = wide.sort_values(sort_dim)
+    wide = wide.sort_values(sort_dim or dims[0])
     picks = [wide.index[0], wide.index[len(wide) // 2], wide.index[-1]][:n]
     text = ideas.set_index("idea_id").idea_text
     lines = ["Here are three ideas with the average scores that other raters gave them:"]
