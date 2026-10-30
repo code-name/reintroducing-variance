@@ -6,9 +6,9 @@ for novelty and usefulness on a 1-5 scale, and the organization's decision in `i
 (`advanced`: 1 if the idea went forward, 0 if not). Use it to see how the field test works, not to
 estimate anything.
 
-```bash
-python -m benchmark.judge run --data-dir examples/screen --backend fake --perturbations P0_baseline \
-       --judges qwen3.8-27b,deepseek-v4-pro          # fake offline judges; drop --backend fake to use real ones
+```powershell
+# Fake offline judges; drop --backend fake to use real ones
+python -m benchmark.judge run --data-dir examples/screen --backend fake --perturbations P0_baseline --judges qwen3.8-27b,deepseek-v4-pro
 python -m benchmark.shadow --data-dir examples/screen
 ```
 

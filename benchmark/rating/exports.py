@@ -1,4 +1,4 @@
-"""Exports in the benchmark's long format (the README's "Bring your own ratings" schema).
+"""Exports in the benchmark's long format (the README's "Run it on your own ideas" schema).
 
 Two kinds:
 

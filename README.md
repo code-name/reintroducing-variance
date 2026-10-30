@@ -31,7 +31,7 @@ python -m benchmark.figures    # the diagnostic figure, saved to results/figure.
 pytest                         # the tests
 ```
 
-`examples/alternative_uses/` has 15 ideas, synthetic ratings and saved scores from five AI judges. Use it to test the tools, not to estimate anything. `benchmark.variance` may print a `ConstantInputWarning` on this small sample; it is safe to ignore.
+`examples/alternative_uses/` has 15 ideas, synthetic ratings and saved scores from five AI judges. These are not the human ratings from the pilot in our proposal, so the numbers will differ. Use it to test the tools, not to estimate anything. `benchmark.variance` may print a `ConstantInputWarning` on this small sample; it is safe to ignore.
 
 ### Start the rating app
 
@@ -71,6 +71,24 @@ Only these commands call a real model, and each needs an [OpenRouter](https://op
 
 Add `--backend fake` to run any of them offline with fake scores, to check your setup.
 
+### Set and test your key
+
+Create a key at [openrouter.ai](https://openrouter.ai) and add credit. Then:
+
+```powershell
+# Copy the settings file, then open .env and paste your key after OPENROUTER_API_KEY=
+copy .env.example .env
+
+# Test the key: six real calls, less than one cent
+python -m benchmark.judge run --data-dir examples/demo --perturbations P0_baseline --judges qwen3.8-27b
+```
+
+| Last line you see | What it means |
+|---|---|
+| `examples/demo: 12 score rows, 0 unparsed` | The key works |
+| `OPENROUTER_API_KEY is not set` | The key is missing from `.env`, or the file was not copied |
+| `AuthenticationError` with `401` (after about 20 seconds) | The key is wrong |
+
 ## Run it on your own ideas
 
 ### 1. Prepare your data
@@ -95,12 +113,11 @@ Edit the copy. Any dimensions and any scale work, but each dimension `id` must m
 
 ### 3. Run the commands
 
+Set and test your key first (see above).
+
 ```powershell
 # Check your data
 python -m benchmark.load my_study/
-
-# Copy the settings file, then paste your API key into .env after OPENROUTER_API_KEY=
-copy .env.example .env
 
 # Have an AI reword your rubric
 python -m benchmark.perturb reword --rubric my_rubric.yaml --out perturbations_my_study
