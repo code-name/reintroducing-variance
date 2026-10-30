@@ -513,7 +513,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m benchmark.variance",
                                 description="The variance pipeline: evaluate sources of disagreement, or run the sources that need new calls.")
     p.add_argument("command", nargs="?", choices=["evaluate", "run"], default="evaluate")
-    p.add_argument("--data-dir", default=str(EXAMPLE_DIR), help="data folder (run; and evaluate's default inputs)")
+    p.add_argument("--data-dir", default=None, help="data folder (default: the example). evaluate reads its ratings, its judge "
+                   "scores (from the folder or results/judge_runs/<folder>/) and the runs made by `run` for it")
     p.add_argument("--ratings", default=None, help="ratings_long.csv (default: the data folder's)")
     p.add_argument("--scores", default=None, help="judge_scores.csv (default: the data folder's, or results/judge_runs/<folder>/)")
     p.add_argument("--variance-runs", default=None, help="folder written by `run` (default: results/variance_runs/<folder>/ if present)")
@@ -525,7 +526,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--backend", choices=["openrouter", "fake"], default="openrouter")
     p.add_argument("--out", default=None)
     a = p.parse_args(argv)
-    data_dir = Path(a.data_dir)
+    data_dir = Path(a.data_dir) if a.data_dir else EXAMPLE_DIR
     if a.command == "run":
         from .judge import DiskCache, FakeBackend, load_env, load_judges
 
@@ -546,7 +547,14 @@ def main(argv: list[str] | None = None) -> int:
     scores_path = Path(a.scores) if a.scores else (data_dir / "judge_scores.csv" if (data_dir / "judge_scores.csv").exists()
                                                     else RESULTS_DIR / "judge_runs" / data_dir.name / "judge_scores.csv")
     scores = pd.read_csv(scores_path)
-    runs = Path(a.variance_runs) if a.variance_runs else RESULTS_DIR / "variance_runs" / data_dir.name
+    # The runs made by `run` belong to a data folder: read them only for the folder named (or the
+    # example when nothing is named), never alongside ratings or scores given as separate files.
+    if a.variance_runs:
+        runs = Path(a.variance_runs)
+    elif a.data_dir or not (a.ratings or a.scores):
+        runs = RESULTS_DIR / "variance_runs" / data_dir.name
+    else:
+        runs = Path("/nonexistent")
     expected = None
     if (runs / "judge_scores.csv").exists():
         scores = pd.concat([scores, pd.read_csv(runs / "judge_scores.csv")], ignore_index=True)
