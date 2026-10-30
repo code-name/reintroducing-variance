@@ -128,3 +128,26 @@ def test_judge_score_import_hashes_config(db, demo, tmp_path):
                                          model_name="m", model_version="v", prompt_name="pointwise_v1.0")
     assert run.config_sha256 == run2.config_sha256 and len(run.config_sha256) == 64
     assert "d001" in render(db, demo["dataset"], "judge_scores")
+
+
+def test_sampler_honours_a_per_idea_target(db, demo, tmp_path):
+    """A subset of the reference set can be rated by more people than the rest."""
+    import csv
+
+    ds, users = demo["dataset"], demo["users"]
+    path = tmp_path / "ideas.csv"
+    with path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["idea_id", "idea_text", "task_id", "source", "target_raters"])
+        w.writerow(["deep1", "An idea many people should rate.", "aut_brick", "human", "4"])
+    assert importers.import_ideas(db, ds, path) == 1
+    seen: dict[str, int] = {}
+    for name in ("r1", "r2", "r3", "r4"):
+        while (a := sampler.next_assignment(db, ds, users[name].id)) is not None:
+            seen[a.idea_id] = seen.get(a.idea_id, 0) + 1
+            record_ratings(db, idea_id=a.idea_id, rater_id=users[name].id, rubric_sha256=ds.rubric_sha256,
+                           scores={"novelty": 3, "usefulness": 3})
+            sampler.complete(db, a)
+    deep = db.query(Idea).filter_by(idea_key="deep1").one()
+    assert seen[deep.id] == 4                                   # its own target
+    assert all(v == 3 for k, v in seen.items() if k != deep.id)  # the dataset's target

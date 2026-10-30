@@ -2,7 +2,9 @@
 
 A data folder holds the tables in the README's "Run it on your own ideas" format:
 
-    ideas.csv         idea_id, idea_text, task_id (optional: source, split)
+    ideas.csv         idea_id, idea_text, task_id (optional: source, split; target_raters for ideas
+                      that need more raters than the dataset default, such as a subset rated by 40
+                      people; advanced, 0 or 1, the organization's decision in a field test)
     tasks.csv         task_id, task_prompt_verbatim
     ratings_long.csv  idea_id, rater_id, dimension, score (optional: scale_min, scale_max, condition)
     judge_scores.csv  AI judge scores written by ``benchmark.judge`` (optional)
@@ -56,6 +58,12 @@ def validate(tables: dict[str, pd.DataFrame]) -> None:
         raise ValueError("ratings: score outside scale")
     if len(ratings) and ratings.duplicated(["idea_id", "rater_id", "dimension"]).any():
         raise ValueError("ratings: duplicate (idea, rater, dimension)")
+    if "advanced" in ideas and not set(pd.to_numeric(ideas.advanced, errors="coerce").dropna()) <= {0, 1}:
+        raise ValueError("ideas: advanced must be 0 or 1")
+    if "target_raters" in ideas:
+        t = pd.to_numeric(ideas.target_raters, errors="coerce").dropna()
+        if (t < 1).any() or (t != t.round()).any():
+            raise ValueError("ideas: target_raters must be a positive whole number")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -7,18 +7,22 @@ The instrument has four modules:
                          with a web app and CLI (adapted from NSDA Corp, see NOTICE).
 - ``benchmark.judge``    the AI judges: the same rubric as the human raters, pluggable backends,
                          a disk cache for every call, a cost log, and a lab's own data folder.
-- ``benchmark.perturb``  stability: changes to the instructions that should not matter, including
-                         rewordings written by an LLM and frozen into versioned files.
+- ``benchmark.perturb``  stability: an LLM rewrites the rating instructions in ways that should not
+                         matter (frozen into versioned files), alongside the other changes of the
+                         stability grid.
 - ``benchmark.agree``    the AI judge diagnostic: agreement, leniency, stability and variance for
-                         every judge, plus the human ceiling and contested ideas.
+                         every judge, plus the human ceiling, contested ideas and how much of the
+                         human disagreement could be measured at all.
 
-Around them: ``benchmark.variance`` (an early prototype of a pipeline that builds panels of AI
-judges that disagree where people disagree), ``benchmark.load`` (reads and checks a data folder)
-and ``benchmark.figures`` (the diagnostic figure).
+Around them: ``benchmark.variance`` (a prototype pipeline that combines and prompts LLMs so that
+AI judgment shows which ideas people would disagree about, judged on contested ideas it has not
+seen), ``benchmark.shadow`` (a prototype field test: an AI judge in shadow next to an
+organization's evaluators), ``benchmark.load`` (reads and checks a data folder) and
+``benchmark.figures`` (the diagnostic figure).
 """
 from pathlib import Path
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_DIR = PACKAGE_DIR.parent

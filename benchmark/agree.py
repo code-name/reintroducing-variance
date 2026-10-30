@@ -31,9 +31,20 @@ The AI judge diagnostic (the instrument's fourth module)
     ``agreement_ladder``: ICC(A,1) for person with person, AI judge with AI judge, and each AI
     judge with itself across repeated samples (Figure 1, panel A).
     ``judge_diagnostics``: one row per judge and dimension on the four measures: agreement,
-    leniency, stability and variance.
+    leniency, stability and variance. Every row also says how much of the human disagreement
+    could be measured at all (``disagreement_reliability``), and so how high the variance
+    measure can go.
     ``diagnose``: everything above for any rated dataset and any set of judge scores, so a lab can
-    run the diagnostic on its own ideas, rubric and raters (``python -m benchmark.agree --diagnose``).
+    run the diagnostic on its own ideas, rubric and raters (``python -m benchmark.agree``).
+
+How much of the human disagreement can be measured
+    ``disagreement_reliability``: disagreement is a property of a group of raters, and small
+    groups measure it poorly. Each idea's raters are split at random into two halves and the
+    per-idea SD of one half is correlated with the other's over ideas (Spearman); Spearman-Brown
+    gives the reliability of the SD from all raters. Its square root is the ceiling on any judge's
+    or panel's correlation with human disagreement. The split is made within each idea, so it
+    works when raters see different ideas (planned-missing designs). Where every rater rated every
+    idea, the curve for panels of k raters is reported too.
 """
 from __future__ import annotations
 
@@ -351,6 +362,68 @@ def pooled_spread(ratings: pd.DataFrame, judge_scores: pd.DataFrame, reference_c
     return pd.DataFrame(rows)
 
 
+# --- How much of the human disagreement can be measured -------------------------------------
+
+def disagreement_reliability(ratings: pd.DataFrame, conditions: set[str] | None = None,
+                             ks: tuple[int, ...] = (5, 10, 15, 20, 40), n_splits: int = 500, seed: int = 1,
+                             min_raters: int = 4) -> pd.DataFrame:
+    """Per dimension: how reliably the raters measure which ideas are contested.
+
+    ``split_half_spearman``: mean Spearman, over random splits, between the per-idea SD of two
+    random halves of each idea's raters (ideas with at least ``min_raters`` raters).
+    ``full_pool_reliability``: Spearman-Brown from the half split to all raters.
+    ``ceiling_for_variance_spearman``: its square root, the most a judge's or panel's spread can
+    correlate with human spread. Rows with ``raters_per_panel`` give, for crossed designs, the
+    agreement between two disjoint panels of k raters."""
+    pool = ratings if conditions is None or "condition" not in ratings else ratings[ratings.condition.isin(conditions)]
+    pool = pool.dropna(subset=["score"])
+    rng = np.random.default_rng(seed)
+    rows = []
+    for dim, g in pool.groupby("dimension"):
+        by_idea = {i: s.to_numpy(float) for i, s in g.groupby("idea_id").score if len(s) >= min_raters}
+        rs = []
+        if len(by_idea) > 3:
+            for _ in range(n_splits):
+                a, b = [], []
+                for v in by_idea.values():
+                    v = rng.permutation(v)
+                    h = len(v) // 2
+                    a.append(np.std(v[:h], ddof=1))
+                    b.append(np.std(v[h:2 * h], ddof=1))
+                if np.std(a) > 0 and np.std(b) > 0:
+                    rs.append(stats.spearmanr(a, b).statistic)
+        half = float(np.nanmean(rs)) if rs else np.nan
+        full = max(0.0, 2 * half / (1 + half)) if not np.isnan(half) and half > -1 else np.nan
+        med = float(np.median([len(v) for v in by_idea.values()])) if by_idea else np.nan
+        rows.append({"dimension": dim, "raters_per_panel": None, "ideas": len(by_idea), "median_raters_per_idea": med,
+                     "split_half_spearman": half, "full_pool_reliability": full,
+                     "ceiling_for_variance_spearman": float(np.sqrt(full)) if not np.isnan(full) else np.nan})
+        wide = g.pivot_table(index="rater_id", columns="idea_id", values="score")
+        if wide.notna().all().all() and wide.shape[1] > 3:  # crossed design: the curve for k raters
+            raters = wide.index.to_numpy()
+            for k in ks:
+                if k < 2 or 2 * k > len(raters):
+                    continue
+                kr = []
+                for _ in range(n_splits):
+                    perm = rng.permutation(raters)
+                    sa, sb = wide.loc[perm[:k]].std(), wide.loc[perm[k:2 * k]].std()
+                    if sa.std() > 0 and sb.std() > 0:
+                        kr.append(stats.spearmanr(sa, sb).statistic)
+                rows.append({"dimension": dim, "raters_per_panel": k, "ideas": wide.shape[1],
+                             "median_raters_per_idea": float(len(raters)), "split_half_spearman": float(np.nanmean(kr)) if kr else np.nan,
+                             "full_pool_reliability": full, "ceiling_for_variance_spearman": float(np.sqrt(full)) if not np.isnan(full) else np.nan})
+    return pd.DataFrame(rows)
+
+
+def _reliability_by_dimension(rel: pd.DataFrame) -> pd.DataFrame:
+    if rel is None or not len(rel):
+        return pd.DataFrame(columns=["dimension", "human_disagreement_reliability", "variance_ceiling"])
+    r = rel[rel.raters_per_panel.isna()][["dimension", "full_pool_reliability", "ceiling_for_variance_spearman"]]
+    return r.rename(columns={"full_pool_reliability": "human_disagreement_reliability",
+                             "ceiling_for_variance_spearman": "variance_ceiling"})
+
+
 # --- The AI judge diagnostic: one report per judge on the four measures --------------------
 
 def _icc_a1(df: pd.DataFrame, rater_col: str) -> float:
@@ -403,7 +476,8 @@ def agreement_ladder(ratings: pd.DataFrame, judge_scores: pd.DataFrame,
 
 def judge_diagnostics(ratings: pd.DataFrame, judge_scores: pd.DataFrame,
                       reference_conditions: set[str] | None = None,
-                      baseline: str = "P0_baseline", sampled: str = "P6_temperature_sampled") -> pd.DataFrame:
+                      baseline: str = "P0_baseline", sampled: str = "P6_temperature_sampled",
+                      reliability: pd.DataFrame | None = None) -> pd.DataFrame:
     """The AI judge diagnostic: one row per judge and dimension, on the four measures.
 
     Agreement   Spearman of the judge's baseline scores with the reference mean, and its percentile
@@ -414,8 +488,14 @@ def judge_diagnostics(ratings: pd.DataFrame, judge_scores: pd.DataFrame,
                 that should not matter (averaged over perturbations other than the sampled run).
     Variance    the judge's ICC(A,1) with itself across repeated samples (people: see
                 ``agreement_ladder``), and the Spearman between its per-idea SD across samples and
-                the human per-idea SD (does it know which ideas people disagree about?).
-    Measures that need a run the data do not have (no perturbations, no repeated samples) are NaN."""
+                the human per-idea SD (does it know which ideas people disagree about?), also
+                corrected for the unreliability of human disagreement.
+    Measurability  how reliably the human raters measured disagreement
+                (``human_disagreement_reliability``) and the ceiling this puts on the variance
+                measure (``variance_ceiling``). A low ceiling means the data cannot show whether
+                the judge sees disagreement, whatever the judge does.
+    Measures that need a run the data do not have (no perturbations, no repeated samples) are NaN.
+    Pass ``reliability`` (from ``disagreement_reliability``) to avoid computing it twice."""
     js = judge_scores.dropna(subset=["score"])
     if "sample_index" not in js:
         js = js.assign(sample_index=0)
@@ -448,21 +528,31 @@ def judge_diagnostics(ratings: pd.DataFrame, judge_scores: pd.DataFrame,
     for c in ("variance_self_icc", "variance_judge_sd", "variance_human_sd", "variance_tracks_human_sd"):
         if c not in out:
             out[c] = np.nan
+    rel = reliability if reliability is not None else disagreement_reliability(r, conds)
+    out = out.merge(_reliability_by_dimension(rel), on="dimension", how="left")
+    for c in ("human_disagreement_reliability", "variance_ceiling"):
+        if c not in out:
+            out[c] = np.nan
+    ok = out.variance_ceiling > 0
+    out["variance_tracks_human_sd_corrected"] = np.where(
+        ok, np.clip(out.variance_tracks_human_sd / out.variance_ceiling.where(ok), -1, 1), np.nan)
     return out.sort_values(["dimension", "judge"], ignore_index=True)
 
 
 def diagnose(ratings: pd.DataFrame, judge_scores: pd.DataFrame,
              reference_conditions: set[str] | None = None) -> dict[str, pd.DataFrame]:
     """The AI judge diagnostic for any rated dataset: the human ceiling, per-idea disagreement,
-    the agreement ladder, the four-measure diagnostic and drift. Inputs are the README long
-    formats; nothing leaves the machine."""
+    how much of the human disagreement could be measured, the agreement ladder, the four-measure
+    diagnostic and drift. Inputs are the README long formats; nothing leaves the machine."""
     has_cond = "condition" in ratings
     r = ratings if has_cond else ratings.assign(condition="all")
     conds = reference_conditions if has_cond else None
+    rel = disagreement_reliability(r, conds)
     out = {"human_ceiling": human_ceiling(r[r.condition.isin(conds)] if conds else r, by_condition=False),
            "idea_disagreement": idea_summary(r, conds),
+           "disagreement_reliability": rel,
            "agreement_ladder": agreement_ladder(r, judge_scores, conds),
-           "judge_diagnostics": judge_diagnostics(r, judge_scores, conds)}
+           "judge_diagnostics": judge_diagnostics(r, judge_scores, conds, reliability=rel)}
     js = judge_scores.dropna(subset=["score"])
     if "perturbation_id" in js and js.perturbation_id.nunique() > 1:
         out["judge_drift"] = drift(_first(js), r, reference_conditions=conds)
@@ -493,6 +583,9 @@ def main(argv: list[str] | None = None) -> int:
         df.to_csv(out / f"{name}.csv", index=False)
         print(f"wrote {out / (name + '.csv')}")
     print(res["judge_diagnostics"].round(2).to_string(index=False))
+    for row in _reliability_by_dimension(res["disagreement_reliability"]).itertuples():
+        print(f"{row.dimension}: the human raters measured disagreement with reliability {row.human_disagreement_reliability:.2f}; "
+              f"no judge's spread can correlate with theirs above {row.variance_ceiling:.2f}.")
     return 0
 
 

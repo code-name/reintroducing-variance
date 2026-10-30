@@ -10,7 +10,7 @@
     <td>{{ r.ds.name }}</td>
     <td>{{ r.rubric.rubric_id }}_v{{ r.rubric.version }}</td>
     <td>{{ r.cov.ideas }}</td><td>{{ r.cov.ratings }}</td><td>{{ r.cov.raters }}</td>
-    <td>{{ r.cov.at_target }} / {{ r.cov.ideas }} (k={{ r.cov.target }})</td>
+    <td>{{ r.cov.at_target }} / {{ r.cov.ideas }} (k={{ r.cov.target }}{% if r.cov.ideas_with_own_target %}; {{ r.cov.ideas_with_own_target }} with their own k{% endif %})</td>
     <td>{% for k, v in r.cov.by_split.items() %}{{ k }} {{ v }}{{ ', ' if not loop.last }}{% endfor %}</td>
     <td>
       {% for kind in ['tasks', 'ideas', 'ratings'] %}

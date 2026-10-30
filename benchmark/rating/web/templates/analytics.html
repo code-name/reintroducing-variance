@@ -8,7 +8,7 @@
 </form>
 {% if dataset %}
 <div class="cards">
-  <div class="card"><h2>Coverage</h2><p>{{ cov.at_target }} of {{ cov.ideas }} ideas have {{ cov.target }} raters.</p></div>
+  <div class="card"><h2>Coverage</h2><p>{{ cov.at_target }} of {{ cov.ideas }} ideas have reached their target ({{ cov.target }} raters{% if cov.ideas_with_own_target %}, or their own target for {{ cov.ideas_with_own_target }} ideas{% endif %}).</p></div>
   <div class="card"><h2>Ratings</h2><p>{{ cov.ratings }} ratings from {{ cov.raters }} raters · {{ flags }} flags.</p></div>
 </div>
 {% for d in rubric.dimensions %}

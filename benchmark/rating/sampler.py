@@ -4,8 +4,11 @@ Adapted from NSDA PLANNING 8.5. Policy (``coverage_v1``):
 
 1. A rater with a pending assignment in the dataset gets that idea again (resume).
 2. Otherwise the candidates are ideas in the dataset that this rater has never been assigned and
-   has never rated, and whose coverage is below the dataset's ``target_raters``. Coverage is
-   the number of distinct raters who have rated the idea or hold a pending assignment for it.
+   has never rated, and whose coverage is below its target: the idea's own ``target_raters``
+   (stored in ``Idea.meta``) if it has one, otherwise the dataset's ``target_raters``. A
+   per-idea target lets a subset of the reference set be rated by more people (for example 40)
+   so that disagreement can be measured well. Coverage is the number of distinct raters who have
+   rated the idea or hold a pending assignment for it.
 3. Least-covered first. Ties are broken by a hash of (rater, idea), so different raters see
    different orders (no shared position effects) while each rater's order is reproducible.
 4. Every assignment is logged with method and priority (coverage at serve time), so the order
@@ -27,6 +30,12 @@ METHOD = "coverage_v1"
 
 def _tiebreak(rater_id: str, idea_id: str) -> str:
     return hashlib.sha256(f"{rater_id}:{idea_id}".encode()).hexdigest()
+
+
+def target(idea: Idea, dataset: Dataset) -> int:
+    """The number of raters an idea should get: its own target if set, else the dataset's."""
+    t = (idea.meta or {}).get("target_raters")
+    return int(t) if t else dataset.target_raters
 
 
 def coverage(db: Session, dataset_id: str) -> Counter:
@@ -63,8 +72,8 @@ def next_assignment(db: Session, dataset: Dataset, rater_id: str) -> Assignment 
     }
     cov = coverage(db, dataset.id)
     candidates = [
-        idea_id for (idea_id,) in db.query(Idea.id).filter_by(dataset_id=dataset.id)
-        if idea_id not in seen and cov.get(idea_id, 0) < dataset.target_raters
+        idea.id for idea in db.query(Idea).filter_by(dataset_id=dataset.id)
+        if idea.id not in seen and cov.get(idea.id, 0) < target(idea, dataset)
     ]
     if not candidates:
         return None

@@ -18,23 +18,29 @@ The pipeline has five steps.
      perspectives     SD across judges asked to rate as a customer, an engineer or an investor
      rater_twins      SD across judges each shown one human rater's own past ratings
      expected_spread  the SD of the rating distribution a judge forecasts for ten raters
-   The first three use runs that already exist. ``plan_perspective_jobs``,
-   ``plan_rater_twin_jobs`` and ``run_expected_spread`` make the calls for the last three through
-   the same cached harness as every other judge call.
-3. Search. ``search_panels`` scores every panel (every subset of judges within a source).
-   ``cross_validated_search`` picks the best panel on training ideas and scores it on ideas it
-   never saw, which is the number to report: choosing the best of many panels on the same ideas
-   inflates the correlation.
-4. Accept or reject on held-out ideas. ``score_spread`` reports the Spearman of panel spread with
-   human spread, the same correlation corrected for the unreliability of human spread, the area
-   under the curve for picking out the most contested ideas, and the panel's own ICC(A,1), which
-   should sit near the human raters' own ICC and not near 1.
+   The first three use the stability runs that already exist. ``run_sources`` makes the calls
+   for the last three through the same cached harness as every other judge call
+   (``python -m benchmark.variance run``).
+3. Search. ``candidate_spreads`` lists every way the runs can produce a per-idea spread: every
+   panel of two or more different judges, each judge's own spread within a source, and each
+   judge's forecast of how people would split. A single judge can pass: it may rate consistently
+   and still flag the right ideas as contested, for example by predicting the spread of scores.
+4. Judge by contested ideas the pipeline has not seen. ``cross_validated_search`` chooses the
+   best candidate on some ideas and tests it on the others, and reports how well the chosen
+   candidate picks out the contested ideas (the top quarter of human disagreement) among ideas it
+   was not chosen on: the area under the curve, with the Spearman of its spread with human spread
+   alongside. Choosing the best of many candidates on the same ideas it is scored on would inflate
+   both. ``score_spread`` reports the same measures for a fixed source, the Spearman corrected
+   for the unreliability of human disagreement, and the panel's own ICC(A,1), which should sit
+   near the human raters' ICC and not near 1.
 5. Deploy. ``panel_output`` returns, for every idea, a mean, a spread and a contested flag.
 
 Nothing here is definitive; it is a demonstration and a starting point for other researchers.
 
-    python -m benchmark.variance                                   # the example folder
-    python -m benchmark.variance --ratings r.csv --scores s.csv    # your own data
+    python -m benchmark.variance                                   # evaluate the example folder
+    python -m benchmark.variance --ratings r.csv --scores s.csv    # evaluate your own data
+    python -m benchmark.variance run --data-dir my_study/ --judges qwen3.8-27b,deepseek-v4-pro
+                                   [--sources perspectives,rater_twins,expected_spread] [--backend fake]
 """
 from __future__ import annotations
 
@@ -61,38 +67,9 @@ def human_disagreement(ratings: pd.DataFrame, conditions: set[str] | None = None
     return agree.reference(ratings, conditions)[["idea_id", "dimension", "n", "mean", "sd"]]
 
 
-def disagreement_reliability(ratings: pd.DataFrame, conditions: set[str] | None = None,
-                             ks: tuple[int, ...] = (5, 10, 15, 20), n_splits: int = 500, seed: int = 1) -> pd.DataFrame:
-    """How well k raters pin down which ideas are contested: the mean Spearman, over random
-    splits, between per-idea SD in two disjoint panels of k raters. Also the full pool's
-    reliability by Spearman-Brown from the largest half split, and the ceiling it puts on any
-    panel's correlation with human SD (its square root)."""
-    pool = ratings if conditions is None or "condition" not in ratings else ratings[ratings.condition.isin(conditions)]
-    rng = np.random.default_rng(seed)
-    rows = []
-    for dim, g in pool.groupby("dimension"):
-        wide = g.pivot_table(index="rater_id", columns="idea_id", values="score")
-        raters = wide.index.to_numpy()
-        n = len(raters)
-        for k in sorted(set(ks) | {n // 2}):
-            if k < 2 or 2 * k > n:
-                continue
-            rs = []
-            for _ in range(n_splits):
-                perm = rng.permutation(raters)
-                a, b = wide.loc[perm[:k]].std(), wide.loc[perm[k:2 * k]].std()
-                ok = a.notna() & b.notna()
-                if ok.sum() > 2:
-                    rs.append(stats.spearmanr(a[ok], b[ok]).statistic)
-            rows.append({"dimension": dim, "raters_per_panel": k, "split_half_spearman": float(np.nanmean(rs)),
-                         "n_raters": n, "n_ideas": wide.shape[1]})
-    out = pd.DataFrame(rows)
-    if len(out):
-        half = out.loc[out.groupby("dimension").raters_per_panel.idxmax()].set_index("dimension").split_half_spearman
-        full = (2 * half / (1 + half)).clip(lower=0)
-        out["full_pool_reliability"] = out.dimension.map(full)
-        out["ceiling_for_panel_spearman"] = np.sqrt(out.full_pool_reliability)
-    return out
+# The reliability of human disagreement lives in the diagnostic, so that every diagnostic reports
+# it; the pipeline uses the same function.
+disagreement_reliability = agree.disagreement_reliability
 
 
 # --- Step 2: sources of disagreement --------------------------------------------------------
@@ -163,9 +140,9 @@ def score_spread(panel_sd: pd.Series, human: pd.DataFrame, reliability: pd.DataF
         r = {"dimension": dim, "n_ideas": len(g), "spearman": float(rho.statistic), "p": float(rho.pvalue),
              "auc_contested": auc, "mean_panel_sd": float(g.panel_sd.mean()), "mean_human_sd": float(g.sd.mean())}
         if reliability is not None and len(reliability):
-            rel = reliability[reliability.dimension == dim].full_pool_reliability
+            rel = reliability[(reliability.dimension == dim) & reliability.raters_per_panel.isna()].full_pool_reliability
             if len(rel) and rel.iloc[0] > 0:
-                r["spearman_disattenuated"] = float(min(1.0, rho.statistic / np.sqrt(rel.iloc[0])))
+                r["spearman_disattenuated"] = float(np.clip(rho.statistic / np.sqrt(rel.iloc[0]), -1.0, 1.0))
         if members is not None:
             sub = members[members.dimension == dim]
             if sub.member.nunique() > 1:
@@ -214,40 +191,108 @@ def search_panels(judge_scores: pd.DataFrame, ratings: pd.DataFrame, conditions:
     return out
 
 
+def candidate_spreads(judge_scores: pd.DataFrame, expected: pd.DataFrame | None = None,
+                      dimension: str = "novelty", min_panel: int = 2) -> dict[str, pd.Series]:
+    """Every per-idea spread the runs support, keyed by a readable name. The spreads use no human
+    data, so they can be computed on all ideas before any split. Panels of different judges need
+    at least ``min_panel`` judges; within-judge sources and forecasts are offered judge by judge
+    and averaged over all judges."""
+    out: dict[str, pd.Series] = {}
+
+    def keep(name, sd):
+        sd = sd.xs(dimension, level="dimension") if isinstance(sd.index, pd.MultiIndex) else sd
+        if len(sd.dropna()) > 3 and sd.std() > 0:
+            out[name] = sd.rename("panel_sd")
+
+    fam = source_scores(judge_scores, "model_families")
+    fam = fam[fam.dimension == dimension]
+    judges = sorted(fam.member.unique())
+    for k in range(min_panel, len(judges) + 1):
+        for combo in itertools.combinations(judges, k):
+            keep("model families: " + " + ".join(combo), spread(fam[fam.member.isin(combo)]))
+    for src in ("temperature", "prompt_variants", "perspectives", "rater_twins"):
+        m = source_scores(judge_scores, src)
+        m = m[m.dimension == dimension]
+        if not len(m):
+            continue
+        per = m.groupby(["judge", "idea_id"]).score.std()
+        for j in sorted(m.judge.unique()):
+            keep(f"{src}: {j}", per.xs(j, level="judge"))
+        if m.judge.nunique() > 1:
+            keep(f"{src}: mean over judges", per.groupby("idea_id").mean())
+    if expected is not None and len(expected):
+        e = expected[expected.dimension == dimension]
+        per = e.set_index(["judge", "idea_id"]).forecast_sd
+        for j in sorted(e.judge.unique()):
+            keep(f"expected spread: {j}", per.xs(j, level="judge"))
+        if e.judge.nunique() > 1:
+            keep("expected spread: mean over judges", per.groupby("idea_id").mean())
+    return out
+
+
+def _auc(scores: np.ndarray, positive: np.ndarray) -> float:
+    if positive.sum() == 0 or positive.sum() == len(positive):
+        return np.nan
+    return float(stats.mannwhitneyu(scores[positive], scores[~positive]).statistic / (positive.sum() * (~positive).sum()))
+
+
 def cross_validated_search(judge_scores: pd.DataFrame, ratings: pd.DataFrame, conditions: set[str] | None = None,
-                           source: str = "model_families", dimension: str = "novelty", test_share: float = 1 / 3,
-                           n_splits: int = 200, seed: int = 1) -> pd.DataFrame:
-    """Honest version of the search: on each random split of ideas, pick the panel with the best
-    Spearman on the training ideas and score it on the test ideas it never saw. Returns one row
-    per split (chosen panel, its training and test Spearman, and the full panel's test Spearman
-    for comparison). Picking the best of many panels on the same ideas it is scored on inflates
-    the result; this does not."""
+                           expected: pd.DataFrame | None = None, dimension: str = "novelty",
+                           test_share: float = 1 / 3, n_splits: int = 200, seed: int = 1,
+                           contested_quantile: float = 0.75) -> pd.DataFrame:
+    """The pipeline's test: how well it picks out the contested ideas among ideas it has not seen.
+
+    On each random split of ideas, the candidate (``candidate_spreads``) that best picks out the
+    contested ideas among the training ideas (AUC; Spearman breaks ties) is chosen, then tested on
+    the other ideas. Contested ideas are the top quarter of human disagreement (per-idea SD over
+    raters). One row per split: the chosen candidate, its training and test AUC and Spearman, and
+    the same test measures for the panel of all judges as a fixed comparison."""
     human = human_disagreement(ratings, conditions)
-    m = source_scores(judge_scores, source)
-    m = m[m.dimension == dimension]
-    if "judge" not in m:
-        m = m.assign(judge=m.member)
-    judges = sorted(m.judge.unique())
-    panels = [c for k in range(2, len(judges) + 1) for c in itertools.combinations(judges, k)]
-    sds = {c: spread(m[m.judge.isin(c)]).reset_index().merge(human, on=["idea_id", "dimension"]).set_index("idea_id")
-           for c in panels}
-    ideas = np.array(sorted(human[human.dimension == dimension].idea_id))
-    n_test = max(4, int(round(len(ideas) * test_share)))
+    h = human[human.dimension == dimension].set_index("idea_id").sd.dropna()
+    cands = {n: sd.reindex(h.index) for n, sd in candidate_spreads(judge_scores, expected, dimension).items()}
+    cands = {n: sd for n, sd in cands.items() if sd.notna().sum() > 3}
+    if not cands or len(h) < 6:
+        return pd.DataFrame()
+    fam = [n for n in cands if n.startswith("model families:")]
+    full = max(fam, key=lambda n: n.count("+")) if fam else None
+    ideas = h.index.to_numpy()
+    n_test = max(3, int(round(len(ideas) * test_share)))
+    cut = h.quantile(contested_quantile)
     rng = np.random.default_rng(seed)
 
-    def rho(df):
-        return stats.spearmanr(df.panel_sd, df.sd).statistic if df.panel_sd.std() > 0 else np.nan
+    def measure(sd, ids):
+        x, y = sd.loc[ids], h.loc[ids]
+        ok = x.notna().to_numpy()
+        x, y = x.to_numpy()[ok], y.to_numpy()[ok]
+        if len(x) < 3 or np.std(x) == 0:
+            return np.nan, np.nan
+        return _auc(x, y >= cut), float(stats.spearmanr(x, y).statistic)
 
     rows = []
     for k in range(n_splits):
         test = rng.choice(ideas, n_test, replace=False)
         train = np.setdiff1d(ideas, test)
-        train_rho = {c: rho(sds[c].loc[sds[c].index.isin(train)]) for c in panels}
-        best = max(panels, key=lambda c: -np.inf if np.isnan(train_rho[c]) else train_rho[c])
-        rows.append({"split": k, "chosen_panel": "+".join(best), "train_spearman": train_rho[best],
-                     "test_spearman": rho(sds[best].loc[sds[best].index.isin(test)]),
-                     "all_judges_test_spearman": rho(sds[tuple(judges)].loc[sds[tuple(judges)].index.isin(test)])})
+        scored = {n: measure(sd, train) for n, sd in cands.items()}
+        best = max(scored, key=lambda n: tuple(-np.inf if np.isnan(v) else v for v in scored[n]))
+        t_auc, t_rho = measure(cands[best], test)
+        f_auc, f_rho = measure(cands[full], test) if full else (np.nan, np.nan)
+        rows.append({"split": k, "chosen": best, "train_auc": scored[best][0], "train_spearman": scored[best][1],
+                     "test_auc": t_auc, "test_spearman": t_rho, "all_judges_test_auc": f_auc,
+                     "all_judges_test_spearman": f_rho})
     return pd.DataFrame(rows)
+
+
+def summarise_search(cv: pd.DataFrame, dimension: str = "novelty") -> pd.DataFrame:
+    """One row: the pipeline's result on unseen ideas (mean over splits)."""
+    if not len(cv):
+        return pd.DataFrame()
+    return pd.DataFrame([{"dimension": dimension, "splits": len(cv),
+                          "test_auc_contested": cv.test_auc.mean(), "test_spearman": cv.test_spearman.mean(),
+                          "train_auc_contested": cv.train_auc.mean(),
+                          "all_judges_test_auc_contested": cv.all_judges_test_auc.mean(),
+                          "all_judges_test_spearman": cv.all_judges_test_spearman.mean(),
+                          "most_often_chosen": cv.chosen.mode().iloc[0],
+                          "share_chosen_most_often": float((cv.chosen == cv.chosen.mode().iloc[0]).mean())}])
 
 
 # --- Step 5: what a screen gets --------------------------------------------------------------
@@ -374,12 +419,66 @@ def run_expected_spread(ideas: pd.DataFrame, tasks: pd.DataFrame, rubric, judge:
     return pd.DataFrame(rows)
 
 
+def run_sources(data_dir, judges: list[dict], *, rubric_path, sources=("perspectives", "rater_twins", "expected_spread"),
+                n_twins: int = 10, seed: int = 1, out_dir=None, backend_factory=None, cache=None,
+                budget_usd: float = 50.0) -> dict[str, pd.DataFrame]:
+    """Make the calls for the sources that need them, through the cached judge harness.
+
+    perspectives     every idea, every judge, each perspective in ``PERSPECTIVES``
+    rater_twins      ``n_twins`` human raters (chosen at random with ``seed``). Each twin sees that
+                     rater's own scores on the training ideas (the ideas whose ``split`` is
+                     ``calibration``; without a split column, a random half) and rates the others.
+    expected_spread  every idea, every judge: the judge forecasts how ten raters would split.
+
+    Writes ``judge_scores.csv`` (perspectives and twins, in the harness format) and
+    ``expected_spread.csv`` to ``out_dir`` (default ``results/variance_runs/<folder name>/``)."""
+    from . import RESULTS_DIR
+    from .judge import DiskCache, OpenRouterBackend, load_rubric, run
+    from .load import read_folder
+
+    data_dir = Path(data_dir)
+    t = read_folder(data_dir)
+    ideas, tasks = t["ideas"], t["tasks"]
+    rubric, _ = load_rubric(Path(rubric_path))
+    out_dir = Path(out_dir) if out_dir else RESULTS_DIR / "variance_runs" / data_dir.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache or DiskCache()
+    jobs = []
+    if "perspectives" in sources:
+        jobs += plan_perspective_jobs(ideas, tasks, rubric)
+    if "rater_twins" in sources:
+        ratings = t.get("ratings_long")
+        if ratings is None or not len(ratings):
+            raise ValueError("rater_twins needs ratings_long.csv in the data folder")
+        rng = np.random.default_rng(seed)
+        if "split" in ideas and (ideas.split == "calibration").any():
+            train = list(ideas.idea_id[ideas.split == "calibration"])
+        else:
+            train = list(rng.choice(ideas.idea_id.to_numpy(), len(ideas) // 2, replace=False))
+        pool = sorted(ratings.rater_id.astype(str).unique())
+        twins = list(rng.choice(pool, min(n_twins, len(pool)), replace=False))
+        jobs += plan_rater_twin_jobs(ideas, tasks, rubric, ratings.assign(rater_id=ratings.rater_id.astype(str)), train, twins)
+    res = {}
+    if jobs:
+        res["judge_scores"] = run(str(data_dir), judges, rubric_path=Path(rubric_path), jobs=jobs, out_dir=out_dir,
+                                  backend_factory=backend_factory, cache=cache, budget_usd=budget_usd)
+    if "expected_spread" in sources:
+        frames = []
+        for j in judges:
+            backend = backend_factory(j) if backend_factory else OpenRouterBackend(j["model"], reasoning_effort=j.get("reasoning_effort"))
+            frames.append(run_expected_spread(ideas, tasks, rubric, j, backend, cache))
+        res["expected_spread"] = pd.concat(frames, ignore_index=True)
+        res["expected_spread"].to_csv(out_dir / "expected_spread.csv", index=False)
+    return res
+
+
 # --- One call on existing runs ----------------------------------------------------------------
 
 def evaluate(ratings: pd.DataFrame, judge_scores: pd.DataFrame, conditions: set[str] | None = None,
              expected: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
-    """Every source the scores support, scored against human disagreement, plus the reliability
-    of human disagreement and the panel search over model families."""
+    """Every source the scores support, scored against human disagreement; the reliability of
+    human disagreement; the in-sample panel search; and the pipeline's test on unseen ideas
+    (``pipeline_test``: how well the chosen candidate picks out the contested ideas)."""
     human = human_disagreement(ratings, conditions)
     rel = disagreement_reliability(ratings, conditions)
     rows = []
@@ -396,40 +495,73 @@ def evaluate(ratings: pd.DataFrame, judge_scores: pd.DataFrame, conditions: set[
     if expected is not None and len(expected):
         sd = expected.groupby(["idea_id", "dimension"]).forecast_sd.mean().rename("panel_sd")
         rows += [{"source": "expected_spread", **r} for r in score_spread(sd, human, rel).to_dict("records")]
-    cv = cross_validated_search(judge_scores, ratings, conditions)
-    summary = pd.DataFrame([{"source": "model_families", "dimension": "novelty", "splits": len(cv),
-                             "mean_train_spearman_of_chosen_panel": cv.train_spearman.mean(),
-                             "mean_test_spearman_of_chosen_panel": cv.test_spearman.mean(),
-                             "mean_test_spearman_all_judges": cv.all_judges_test_spearman.mean(),
-                             "most_chosen_panel": cv.chosen_panel.mode().iloc[0]}]) if len(cv) else pd.DataFrame()
+    dims = sorted(human.dimension.unique())
+    summary = pd.concat([summarise_search(cross_validated_search(judge_scores, ratings, conditions, expected, d), d)
+                         for d in dims], ignore_index=True)
     return {"variance_sources": pd.DataFrame(rows), "disagreement_reliability": rel,
             "panel_search": search_panels(judge_scores, ratings, conditions),
-            "panel_search_cross_validated": summary}
+            "pipeline_test": summary}
 
 
 def main(argv: list[str] | None = None) -> int:
     import argparse
+    import os
 
-    from . import RESULTS_DIR
-
-    p = argparse.ArgumentParser(prog="python -m benchmark.variance")
-    p.add_argument("--ratings", default=None, help="ratings_long.csv (default: the example)")
-    p.add_argument("--scores", default=None, help="judge_scores.csv (default: the example)")
-    p.add_argument("--reference-condition", default=None, help="raters in this condition form the reference")
-    p.add_argument("--out", default=None)
-    a = p.parse_args(argv)
+    from . import REPO_DIR, RESULTS_DIR
     from .load import EXAMPLE_DIR
 
-    ratings = pd.read_csv(a.ratings or EXAMPLE_DIR / "ratings_long.csv")
+    p = argparse.ArgumentParser(prog="python -m benchmark.variance",
+                                description="The variance pipeline: evaluate sources of disagreement, or run the sources that need new calls.")
+    p.add_argument("command", nargs="?", choices=["evaluate", "run"], default="evaluate")
+    p.add_argument("--data-dir", default=str(EXAMPLE_DIR), help="data folder (run; and evaluate's default inputs)")
+    p.add_argument("--ratings", default=None, help="ratings_long.csv (default: the data folder's)")
+    p.add_argument("--scores", default=None, help="judge_scores.csv (default: the data folder's, or results/judge_runs/<folder>/)")
+    p.add_argument("--variance-runs", default=None, help="folder written by `run` (default: results/variance_runs/<folder>/ if present)")
+    p.add_argument("--reference-condition", default=None, help="raters in this condition form the reference")
+    p.add_argument("--judges", default=None, help="run: comma-separated labels from configs/judges.yaml")
+    p.add_argument("--sources", default="perspectives,rater_twins,expected_spread", help="run: which sources to call")
+    p.add_argument("--twins", type=int, default=10, help="run: number of human raters to build twins of")
+    p.add_argument("--rubric", default=None, help="run: rubric YAML (default: the one in configs/judges.yaml)")
+    p.add_argument("--backend", choices=["openrouter", "fake"], default="openrouter")
+    p.add_argument("--out", default=None)
+    a = p.parse_args(argv)
+    data_dir = Path(a.data_dir)
+    if a.command == "run":
+        from .judge import DiskCache, FakeBackend, load_env, load_judges
+
+        load_env()
+        cfg = load_judges()
+        judges = [j for j in cfg["judges"] if not a.judges or j["label"] in a.judges.split(",")]
+        fake = a.backend == "fake"
+        res = run_sources(data_dir, judges, rubric_path=Path(a.rubric) if a.rubric else REPO_DIR / cfg["rubric"],
+                          sources=tuple(a.sources.split(",")), n_twins=a.twins, out_dir=a.out,
+                          backend_factory=(lambda j: FakeBackend(j["label"])) if fake else None,
+                          cache=DiskCache(RESULTS_DIR / "cache_fake") if fake else None,
+                          budget_usd=float(os.environ.get("JUDGE_BUDGET_USD", cfg.get("budget_usd", 50))))
+        for name, df in res.items():
+            print(f"{name}: {len(df):,} rows")
+        return 0
+    ratings = pd.read_csv(a.ratings or data_dir / "ratings_long.csv")
     conds = {a.reference_condition} if a.reference_condition else None
-    scores = pd.read_csv(a.scores or EXAMPLE_DIR / "judge_scores.csv")
-    out = Path(a.out) if a.out else RESULTS_DIR / "variance"
+    scores_path = Path(a.scores) if a.scores else (data_dir / "judge_scores.csv" if (data_dir / "judge_scores.csv").exists()
+                                                    else RESULTS_DIR / "judge_runs" / data_dir.name / "judge_scores.csv")
+    scores = pd.read_csv(scores_path)
+    runs = Path(a.variance_runs) if a.variance_runs else RESULTS_DIR / "variance_runs" / data_dir.name
+    expected = None
+    if (runs / "judge_scores.csv").exists():
+        scores = pd.concat([scores, pd.read_csv(runs / "judge_scores.csv")], ignore_index=True)
+    if (runs / "expected_spread.csv").exists():
+        expected = pd.read_csv(runs / "expected_spread.csv")
+    out = Path(a.out) if a.out else RESULTS_DIR / "variance" / data_dir.name
     out.mkdir(parents=True, exist_ok=True)
-    res = evaluate(ratings, scores, conds)
+    res = evaluate(ratings, scores, conds, expected)
     for name, df in res.items():
         df.to_csv(out / f"{name}.csv", index=False)
         print(f"wrote {out / (name + '.csv')}")
     print(res["variance_sources"].round(2).to_string(index=False))
+    if len(res["pipeline_test"]):
+        print("\nThe pipeline on ideas it has not seen (picking out the top quarter of contested ideas):")
+        print(res["pipeline_test"].round(2).to_string(index=False))
     return 0
 
 

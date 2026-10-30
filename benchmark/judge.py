@@ -206,7 +206,9 @@ class OpenRouterBackend:
 
 
 class FakeBackend:
-    """Deterministic offline backend for tests and dry runs: scores are a hash of the prompt."""
+    """Deterministic offline backend for tests and try-outs: scores are a hash of the model and the
+    prompt, so different fake judges differ. It reads the dimensions from the reply format in the
+    prompt, so it works with any rubric, and it answers the expected-spread prompt with counts."""
 
     name = "fake"
 
@@ -214,13 +216,27 @@ class FakeBackend:
         self.model, self.dims = model, dims
 
     def complete(self, system: str, user: str, *, temperature: float, max_tokens: int) -> dict[str, Any]:
-        h = hashlib.sha256((user + str(temperature)).encode()).digest()
-        if "[1]" in user:  # batch prompt
+        h = hashlib.sha256((self.model + user + str(temperature)).encode()).digest()
+        spread_dims = re.findall(r'"(\w+)": \{"\d+": <count>', user)
+        dims = re.findall(r'"(\w+)": <integer', user) or list(self.dims)
+        dims = list(dict.fromkeys(d for d in dims if d != "id"))
+        if spread_dims:  # expected-spread prompt: ten raters over the scale points
+            points = re.findall(r'"(\d+)": <count>', user)
+            points = list(dict.fromkeys(points))
+            out = {}
+            for i, d in enumerate(dict.fromkeys(spread_dims)):
+                counts = [h[(i * 7 + j) % len(h)] % 4 for j in range(len(points))]
+                total = sum(counts) or 1
+                scaled = [round(10 * c / total) for c in counts]
+                scaled[-1] += 10 - sum(scaled)
+                out[d] = {p: max(0, c) for p, c in zip(points, scaled)}
+            text = json.dumps(out)
+        elif "[1]" in user:  # batch prompt
             n = user.count("\n[") + 1
-            items = [{"id": k, **{d: 1 + h[(k * 2 + i) % len(h)] % 5 for i, d in enumerate(self.dims)}} for k in range(1, n + 1)]
+            items = [{"id": k, **{d: 1 + h[(k * 2 + i) % len(h)] % 5 for i, d in enumerate(dims)}} for k in range(1, n + 1)]
             text = json.dumps(items)
         else:
-            text = json.dumps({**{d: 1 + h[i] % 5 for i, d in enumerate(self.dims)}, "rationale": "fake"})
+            text = json.dumps({**{d: 1 + h[i] % 5 for i, d in enumerate(dims)}, "rationale": "fake"})
         return {"text": text, "usage": {"prompt_tokens": len(user) // 4, "completion_tokens": 30}, "cost_usd": 0.0,
                 "provider": "fake", "model_served": self.model, "temperature_dropped": False}
 
@@ -344,7 +360,7 @@ def dataset_tables(dataset: str) -> tuple["pd.DataFrame", "pd.DataFrame", "pd.Da
     return ideas, tasks, reference(ratings, conds)
 
 
-def run(dataset: str, judges: list[dict], *, rubric_path: Path, perturbation_set: str = "perturbations_v1.1",
+def run(dataset: str, judges: list[dict], *, rubric_path: Path, perturbation_set: str = "perturbations_v1.2",
         perturbation_ids: list[str] | None = None, out_dir: Path | None = None, cache: DiskCache | None = None,
         budget_usd: float = 50.0, dry_run: bool = False, backend_factory=None, max_workers: int = 8,
         write: bool = False, jobs: list[dict] | None = None) -> "pd.DataFrame":
@@ -436,7 +452,7 @@ def run(dataset: str, judges: list[dict], *, rubric_path: Path, perturbation_set
     return df
 
 
-def plan(dataset: str, judges: list[dict], *, rubric_path: Path, perturbation_set: str = "perturbations_v1.1",
+def plan(dataset: str, judges: list[dict], *, rubric_path: Path, perturbation_set: str = "perturbations_v1.2",
          perturbation_ids: list[str] | None = None, out_tokens: int = 400) -> "pd.DataFrame":
     """Calls and an upper-bound cost estimate per judge, from rendered prompt length and the
     prices in configs/judges.yaml. No network."""
@@ -482,7 +498,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out-suffix", default="", help="write to results/judge_runs/<dataset><suffix>/ (for per-judge parallel runs)")
     p.add_argument("--data-dir", default=None, help="your own data: a folder with ideas.csv, tasks.csv, ratings_long.csv")
     p.add_argument("--rubric", default=None, help="rubric YAML (default: the one in configs/judges.yaml)")
-    p.add_argument("--perturbation-set", default="perturbations_v1.1", help="perturbation file in benchmark/prompts/")
+    p.add_argument("--perturbation-set", default="perturbations_v1.2",
+                   help="perturbation file in benchmark/prompts/ (v1.2: LLM-written rewordings; v1.1: the hand-written ones of the first pilot runs)")
     p.add_argument("--backend", choices=["openrouter", "fake"], default="openrouter",
                    help="fake = deterministic offline scores, for trying the pipeline without a key")
     a = p.parse_args(argv)

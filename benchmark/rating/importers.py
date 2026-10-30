@@ -51,7 +51,9 @@ def import_tasks(db: Session, dataset: Dataset, path: Path) -> int:
 
 def import_ideas(db: Session, dataset: Dataset, path: Path) -> int:
     """``idea_id, idea_text, task_id, source`` plus optional ``model_name, model_version,
-    generation_condition, split``. Tasks must be imported first."""
+    generation_condition, split, target_raters``. ``target_raters`` overrides the dataset's
+    target for one idea, for example a subset of the reference set rated by 40 people. Tasks must
+    be imported first."""
     rows = _read_csv(path, ("idea_id", "idea_text", "task_id", "source"))
     tasks = {t.task_key: t for t in db.query(Task).filter_by(dataset_id=dataset.id)}
     added = 0
@@ -63,6 +65,14 @@ def import_ideas(db: Session, dataset: Dataset, path: Path) -> int:
         split = r.get("split") or "unassigned"
         if split not in SPLITS:
             raise ImportErrorWithRow(f"row {i}: split must be one of {SPLITS}")
+        meta = {"import_source": Path(path).name}
+        if r.get("target_raters"):
+            try:
+                meta["target_raters"] = int(r["target_raters"])
+            except ValueError:
+                raise ImportErrorWithRow(f"row {i}: target_raters must be a whole number") from None
+            if meta["target_raters"] < 1:
+                raise ImportErrorWithRow(f"row {i}: target_raters must be at least 1")
         if db.query(Idea).filter_by(dataset_id=dataset.id, idea_key=r["idea_id"]).one_or_none():
             continue
         db.add(Idea(
@@ -70,7 +80,7 @@ def import_ideas(db: Session, dataset: Dataset, path: Path) -> int:
             text=r["idea_text"], text_sha256=text_sha256(r["idea_text"]), source=r["source"],
             model_name=r.get("model_name") or None, model_version=r.get("model_version") or None,
             generation_condition=r.get("generation_condition") or None, split=split,
-            meta={"import_source": Path(path).name},
+            meta=meta,
         ))
         added += 1
     db.commit()

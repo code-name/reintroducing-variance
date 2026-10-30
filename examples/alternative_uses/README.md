@@ -7,7 +7,7 @@ A small, complete data folder that shows the instrument working without an API k
 | `ideas.csv` | 15 alternative uses of a tin can, a brick and a ping pong ball (researcher-written stimuli from Calic et al., 2020, *Scientific Reports* 10:2144) |
 | `tasks.csv` | The three tasks |
 | `ratings_long.csv` | Novelty and usefulness on a 1-5 scale from 39 raters. **The ratings are synthetic**: they were generated to resemble human ratings and no real rater's responses are included. Use them to see how the tools work, not to estimate anything. |
-| `judge_scores.csv` | Scores from five AI judges under the stability grid P0 to P6 (`benchmark/prompts/perturbations_v1.1.yaml`), written by `benchmark.judge` |
+| `judge_scores.csv` | Scores from five AI judges under the stability grid P0 to P6, written by `benchmark.judge`. These first pilot runs used `perturbations_v1.1.yaml`, whose P1 rewordings were written by hand; the default grid is now `perturbations_v1.2.yaml`, whose rewordings were written by an LLM. |
 
 ```bash
 python -m benchmark.agree        # the AI judge diagnostic

@@ -6,6 +6,13 @@ swapped order or removed anchors applied). ``plan_jobs`` expands a perturbation 
 ideas into concrete jobs: one per prompt to send, carrying the template values, the ideas covered,
 the temperature and the sample index. Rendering and sending happen in ``benchmark.judge``.
 
+The default set is ``perturbations_v1.2``: its P1 rewordings were written by an LLM
+(qwen/qwen3.8-27b, prompt ``reword_v1.0``) and frozen. ``perturbations_v1.1`` holds the
+hand-written rewordings used in the first pilot runs. A rubric whose statements the set does not
+cover cannot run P1 until an LLM has reworded it:
+
+    python -m benchmark.perturb reword --rubric my_rubric.yaml --out perturbations_my_study
+
 ``generate_rewordings`` asks a model (any backend of ``benchmark.judge``) to reword the rubric's
 statements without changing their meaning, and ``write_perturbation_set`` freezes the result into a
 new versioned perturbation file, recording the generating model, prompt and date. Every later run
@@ -27,7 +34,10 @@ import yaml
 from . import PROMPTS_DIR
 
 
-def load_perturbations(name: str = "perturbations_v1.1", prompts_dir: Path = PROMPTS_DIR) -> dict[str, Any]:
+DEFAULT_SET = "perturbations_v1.2"
+
+
+def load_perturbations(name: str = DEFAULT_SET, prompts_dir: Path = PROMPTS_DIR) -> dict[str, Any]:
     """Load and check a perturbation set: unique ids, a ``P0_baseline`` entry, and a
     ``base_prompt`` that exists."""
     path = prompts_dir / f"{name}.yaml"
@@ -101,6 +111,13 @@ def plan_jobs(perturbations: dict, ideas: pd.DataFrame, tasks: pd.DataFrame, rub
         temp, n_samples = float(over.get("temperature", 0.0)), int(over.get("n_samples", 1))
         t = p.get("transform", "none")
         if t == "reword_rubric":
+            missing = sorted({d for st in p["variants"].values() for d in dims if d not in st})
+            if missing:
+                raise ValueError(
+                    f"{pid}: the rewordings in this perturbation set do not cover the rubric's {missing} "
+                    f"statement(s). Have an LLM reword your rubric first: python -m benchmark.perturb reword "
+                    f"--rubric <your rubric.yaml> --out perturbations_<name>, then pass --perturbation-set "
+                    f"perturbations_<name> (or leave {pid} out with --perturbations).")
             variants = [(name, rubric_values(rubric, statements=st)) for name, st in p["variants"].items()]
         elif t == "swap_dimensions":
             variants = [("", rubric_values(rubric, swap=True))]
@@ -198,7 +215,7 @@ def _parse_rewordings(text: str, dims: list[str]) -> list[dict[str, str]]:
 
 
 def write_perturbation_set(variants: list[dict[str, str]], provenance: dict, *, out_name: str,
-                           base: str = "perturbations_v1.1", prompts_dir=None, date: str | None = None) -> Path:
+                           base: str = DEFAULT_SET, prompts_dir=None, date: str | None = None) -> Path:
     """Copy ``base`` and replace the P1 variants with the model-written rewordings. The new file
     records where the rewordings came from. Refuses to overwrite an existing file (released
     prompt files are never edited)."""
@@ -235,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--backend", choices=["openrouter", "fake"], default="openrouter")
     p.add_argument("--n", type=int, default=3)
     p.add_argument("--rubric", default=None, help="rubric YAML (default: configs/judges.yaml)")
-    p.add_argument("--base", default="perturbations_v1.1")
+    p.add_argument("--base", default=DEFAULT_SET)
     p.add_argument("--out", required=True, help="new perturbation file name, e.g. perturbations_v1.2")
     a = p.parse_args(argv)
     load_env()

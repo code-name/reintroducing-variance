@@ -1,0 +1,13 @@
+idea_id,idea_text,task_id,source,advanced
+s01,A subscription that repairs and resells customers' broken small appliances.,screen,human,0
+s02,"A shared tool library for apartment buildings, run through a building app.",screen,human,0
+s03,Reusable shipping boxes that customers return through the mail carrier's next visit.,screen,human,1
+s04,A loyalty card that pays out in hours of free childcare at partner centres.,screen,human,1
+s05,An app that matches surplus restaurant food with night-shift workers.,screen,human,0
+s06,Office chairs leased by the hour to hybrid workers who come in twice a week.,screen,human,0
+s07,A paint that changes colour when a room's air quality drops.,screen,human,0
+s08,Grocery delivery timed to when a household's fridge sensor reports low stock.,screen,human,1
+s09,Insurance for freelancers that pays out when a client pays late.,screen,human,0
+s10,A bakery that sells yesterday's bread as cheap croutons and bread pudding.,screen,human,0
+s11,Walking tours of a city led by the people who clean its streets at night.,screen,human,1
+s12,A printer that prints receipts on seed paper customers can plant.,screen,human,0

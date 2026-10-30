@@ -61,7 +61,7 @@ def most_contested(rows: list[dict], dimension: str, top: int = 20, min_n: int =
 
 def coverage_summary(db: Session, dataset) -> dict:
     """Counts for dashboards: ideas, ratings, raters, ideas at target, by split."""
-    from .sampler import coverage
+    from .sampler import coverage, target
 
     ideas = db.query(Idea).filter_by(dataset_id=dataset.id).all()
     cov = coverage(db, dataset.id)
@@ -72,9 +72,11 @@ def coverage_summary(db: Session, dataset) -> dict:
         r for (r,) in db.query(Rating.rater_id).join(Idea, Idea.id == Rating.idea_id)
         .filter(Idea.dataset_id == dataset.id).distinct()
     }
-    at_target = sum(1 for i in ideas if cov.get(i.id, 0) >= dataset.target_raters)
+    at_target = sum(1 for i in ideas if cov.get(i.id, 0) >= target(i, dataset))
     by_split: dict[str, int] = defaultdict(int)
     for i in ideas:
         by_split[i.split] += 1
     return {"ideas": len(ideas), "ratings": n_ratings, "raters": len(raters),
-            "at_target": at_target, "target": dataset.target_raters, "by_split": dict(by_split)}
+            "at_target": at_target, "target": dataset.target_raters,
+            "ideas_with_own_target": sum(1 for i in ideas if (i.meta or {}).get("target_raters")),
+            "by_split": dict(by_split)}
