@@ -11,8 +11,8 @@ judges:
   - {label: claude-opus-5.5,   model: anthropic/claude-opus-5.5,   kind: closed,      reasoning_effort: low, price_in_per_m: 4.00, price_out_per_m: 20.00}
   - {label: gpt-6.1-sol,       model: openai/gpt-6.1-sol,          kind: closed,      reasoning_effort: low, price_in_per_m: 2.00, price_out_per_m: 10.00}
   - {label: gemini-4-argon,    model: google/gemini-4-argon,       kind: closed,      reasoning_effort: low, price_in_per_m: 2.00, price_out_per_m: 10.00}
-  # Open-weight models: the reproducibility path. Weights are public (Hugging Face ids below), so the
-  # whole grid can be re-run locally without any provider.
+  # Open-weight models: the reproducibility path. Weights are public (Hugging Face ids below);
+  # running them locally is planned.
   - {label: deepseek-v4-pro,   model: deepseek/deepseek-v4-pro-0813, kind: open-weight, hf: deepseek-ai/DeepSeek-V4-Pro-0813, reasoning_effort: low, price_in_per_m: 0.66, price_out_per_m: 1.98}
   - {label: qwen3.8-27b,       model: qwen/qwen3.8-27b,            kind: open-weight, hf: Qwen/Qwen3.8-27B, reasoning_effort: low, price_in_per_m: 0.04, price_out_per_m: 1.35}
 
