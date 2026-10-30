@@ -40,10 +40,26 @@ No API key needed:
 ```powershell
 python -m benchmark.rating.cli init-db          # first time only
 python -m benchmark.rating.cli seed-dev-users   # test logins, localhost only
+
+# The app starts empty, so load data (the invented demo here)
+python -m benchmark.rating.cli add-rubric --file configs/rubrics/novelty_usefulness_v1.0.yaml
+python -m benchmark.rating.cli create-dataset --name demo --rubric novelty_usefulness_v1.0 --target-raters 3
+python -m benchmark.rating.cli import-tasks   --dataset demo --file examples/demo/tasks.csv
+python -m benchmark.rating.cli import-ideas   --dataset demo --file examples/demo/ideas.csv
+python -m benchmark.rating.cli import-ratings --dataset demo --file examples/demo/ratings_long.csv
+
+# Start the app
 python -m benchmark.rating.cli serve
 ```
 
-Open http://127.0.0.1:8000 and log in as `admin` or `rater1`. The password is in `configs/rating_app.yaml`. The app starts empty; to load data, see [The rating platform](#the-rating-platform).
+Open http://127.0.0.1:8000 and log in as `admin` or `rater1`. The password is in `configs/rating_app.yaml`.
+
+To export ratings, stop the app with `Ctrl+C`, then run:
+
+```powershell
+python -m benchmark.rating.cli export --dataset demo            # everything, to data/processed/demo/
+python -m benchmark.rating.cli export --dataset demo --release  # publishable, to data/release/demo/
+```
 
 ## When you need an API key
 
@@ -107,9 +123,40 @@ python -m benchmark.variance --data-dir my_study/
 
 Outputs go to `results/`. Calls are cached, so reruns do not pay twice. `JUDGE_BUDGET_USD` in `.env` sets a hard spend limit.
 
-## How the diagnostic works
+## How it works
 
-`benchmark.agree` writes one report per AI judge:
+Each box has the same name as a heading below. Dashed boxes are prototypes.
+
+```mermaid
+flowchart TD
+    I["Inputs"] --> M1["Module 1: the rating platform"]
+    I --> M2["Module 2: AI judges"]
+    M2 --> M3["Module 3: stability"]
+    M1 -- human ratings --> M4["Module 4: the AI judge diagnostic"]
+    M3 -- AI scores --> M4
+    M1 --> V["The variance pipeline (prototype)"]
+    M3 --> V
+    M1 --> F["The field test (prototype)"]
+    M3 --> F
+    classDef proto stroke-dasharray: 5 4
+    class V,F proto
+```
+
+### Module 1: the rating platform
+
+`benchmark/rating/` is a self-hosted web app and CLI for collecting human ratings, adapted from NSDA Corp's annotation apps (see `NOTICE`). Raters rate blind, each idea gets 10 raters by default, and release exports withhold held-out scores.
+
+### Module 2: AI judges
+
+`benchmark/judge.py` sends the same ideas to AI judges with the same rubric the raters read, through OpenRouter. Every call is cached with its prompt, model, provider and cost.
+
+### Module 3: stability
+
+`benchmark/perturb.py` runs each judge under small prompt changes that should not change its scores: reworded statements, swapped dimension order, removed scale labels, batching and worked examples.
+
+### Module 4: the AI judge diagnostic
+
+`benchmark/agree.py` writes one report per AI judge:
 
 | Measure | Question |
 |---|---|
@@ -118,11 +165,11 @@ Outputs go to `results/`. Calls are cached, so reruns do not pay twice. `JUDGE_B
 | **Leniency** | Does it score ideas higher or lower than people? |
 | **Stability** | Does it score the same way when the prompt changes in ways that should not matter? |
 
-## The variance pipeline (prototype)
+### The variance pipeline (prototype)
 
 `benchmark/variance.py` searches for a way to make AI judgment flag the ideas people would disagree about. It chooses the best candidate on some ideas, tests it on unseen ones, and returns a mean, a spread and a contested flag per idea. It needs many rated ideas; the example's 15 only demonstrate the steps.
 
-## The field test (prototype)
+### The field test (prototype)
 
 `benchmark/shadow.py` compares an AI judge with an organization's evaluators without affecting their decisions. It reports how many advanced ideas the judge would have dropped, and whether those are the ideas the evaluators disagreed about.
 
@@ -134,28 +181,6 @@ python -m benchmark.shadow --data-dir examples/screen
 ```
 
 For real data, use your own folder and leave out `--backend fake`.
-
-## The rating platform
-
-`benchmark/rating/` is a self-hosted web app and CLI for collecting human ratings, adapted from NSDA Corp's annotation apps (see `NOTICE`). Raters rate blind, each idea gets 10 raters by default, and release exports withhold held-out scores.
-
-To load the invented data in `examples/demo/`, stop the app with `Ctrl+C`, then run:
-
-```powershell
-python -m benchmark.rating.cli add-rubric --file configs/rubrics/novelty_usefulness_v1.0.yaml
-python -m benchmark.rating.cli create-dataset --name demo --rubric novelty_usefulness_v1.0 --target-raters 3
-python -m benchmark.rating.cli import-tasks   --dataset demo --file examples/demo/tasks.csv
-python -m benchmark.rating.cli import-ideas   --dataset demo --file examples/demo/ideas.csv
-python -m benchmark.rating.cli import-ratings --dataset demo --file examples/demo/ratings_long.csv
-python -m benchmark.rating.cli serve
-```
-
-To export the ratings:
-
-```powershell
-python -m benchmark.rating.cli export --dataset demo            # everything, to data/processed/demo/
-python -m benchmark.rating.cli export --dataset demo --release  # publishable, to data/release/demo/
-```
 
 ## Data privacy
 
