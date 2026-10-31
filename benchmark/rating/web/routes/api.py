@@ -42,7 +42,7 @@ def _api_user(request: Request) -> User | None:
 async def export_table(request: Request, table: str, dataset: str, split: str | None = None):
     user = _api_user(request)
     if user is None:
-        raise HTTPException(status_code=401, headers={"WWW-Authenticate": 'Basic realm="orgsci export"'})
+        raise HTTPException(status_code=401, headers={"WWW-Authenticate": 'Basic realm="Where is the variance? export"'})
     if user.role != "admin":
         raise HTTPException(status_code=403, detail="admin only")
     if table not in TABLES:

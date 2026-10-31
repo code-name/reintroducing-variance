@@ -34,7 +34,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     cfg = config or load_config()
     session_factory = init_db(cfg.db_path)
 
-    app = FastAPI(title="OrgSci idea rating", version="0.1.0")
+    app = FastAPI(title="Where is the variance? Idea rating", version="0.1.0")
     app.state.cfg = cfg
     app.state.session_factory = session_factory
     app.add_middleware(SessionMiddleware, secret_key=session_secret(cfg), max_age=60 * 60 * 12,
