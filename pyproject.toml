@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reintroducing-variance"
 version = "0.4.0"
-description = "Reintroducing variance into idea evaluation: an open instrument for trusting AI judges"
+description = "Where is the variance? An open instrument for trusting AI judges"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

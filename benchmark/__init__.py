@@ -1,4 +1,4 @@
-"""Reintroducing variance into idea evaluation: an open instrument for trusting AI judges.
+"""Where is the variance? An open instrument for trusting AI judges.
 
 The instrument has four modules:
 

@@ -1,4 +1,4 @@
-# Reintroducing variance into idea evaluation
+# Where is the variance?
 
 **An open instrument for trusting AI judges.** Benchmarks LLMs that rate ideas against human raters, including whether a model can identify which ideas people disagree about.
 
